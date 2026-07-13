@@ -398,6 +398,51 @@ function generateLevel(level, colors, merged, isChallenge) {
     }
   }
 
+  // Fairness pass: re-shuffle if any tube has 3+ of the same color
+  // This prevents "same color in same row" feel and ensures good puzzles
+  for (let attempt = 0; attempt < 30; attempt++) {
+    let unfair = false;
+    outer: for (const t of tubes) {
+      const counts = {};
+      for (const u of t) if (u !== -1) counts[u] = (counts[u] || 0) + 1;
+      for (const n of Object.values(counts)) {
+        if (n >= 3) { unfair = true; break outer; }
+      }
+    }
+    if (!unfair) break;
+
+    // Re-shuffle and redistribute
+    for (let i = units.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [units[i], units[j]] = [units[j], units[i]];
+    }
+    for (let i = 0; i < totalTubes; i++) {
+      tubes[i] = [];
+      for (let j = 0; j < TUBE_HEIGHT; j++) {
+        const idx = i * TUBE_HEIGHT + j;
+        tubes[i].push(idx < units.length ? units[idx] : -1);
+      }
+      tubes[i].sort((a, b) => (b === -1 ? -1 : 0) - (a === -1 ? -1 : 0));
+    }
+
+    // Re-check isSolved after shuffle
+    const isSolvedNow = tubes.every(t => {
+      const ne = t.filter(u => u !== -1);
+      return ne.length === 0 || (ne.length === TUBE_HEIGHT && ne.every(u => u === ne[0]));
+    });
+    if (isSolvedNow && tubes.length >= 2) {
+      const neTubes = tubes.filter(t => t.some(u => u !== -1));
+      if (neTubes.length >= 2) {
+        const a = neTubes[0], b = neTubes[1];
+        const ia = a.findIndex(u => u !== -1);
+        const ib = b.findIndex(u => u !== -1);
+        [a[ia], b[ib]] = [b[ib], a[ia]];
+        a.sort((x,y) => (y === -1 ? -1 : 0) - (x === -1 ? -1 : 0));
+        b.sort((x,y) => (y === -1 ? -1 : 0) - (x === -1 ? -1 : 0));
+      }
+    }
+  }
+
   let totalTime = 0;
   if (isChallenge) {
     totalTime = getChallengeTime(level, activeColors.length);

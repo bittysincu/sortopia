@@ -25,7 +25,7 @@
   }
   #header {
     display: flex; justify-content: space-between; align-items: center;
-    padding: 4px 8px 12px;
+    padding: 4px 8px 8px;
     color: #fff;
   }
   #header h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.5px;
@@ -33,6 +33,27 @@
     -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
   #header .stat { font-size: 12px; opacity: 0.7; }
   #header .stat span { opacity: 1; font-weight: 600; }
+
+  #timer-bar-wrap {
+    width: 100%; height: 4px; background: rgba(255,255,255,0.06);
+    border-radius: 2px; margin-bottom: 6px; overflow: hidden;
+  }
+  #timer-bar {
+    height: 100%; width: 100%;
+    background: linear-gradient(90deg, #2ecc71, #f1c40f, #e74c3c);
+    border-radius: 2px;
+    transition: width 0.3s linear;
+  }
+  #timer-bar.urgent { transition: width 0.1s linear; }
+
+  #timer-text {
+    display: flex; justify-content: center; align-items: center;
+    gap: 4px; font-size: 20px; font-weight: 700; letter-spacing: -0.5px;
+    margin-bottom: 4px;
+  }
+  #timer-text .num { color: #fff; }
+  #timer-text .label { font-size: 11px; opacity: 0.5; font-weight: 400; }
+
   canvas {
     display: block;
     width: 100%;
@@ -45,7 +66,7 @@
   }
   #footer {
     display: flex; justify-content: space-between; align-items: center;
-    padding: 12px 6px 4px;
+    padding: 8px 6px 4px;
     color: rgba(255,255,255,0.5);
     font-size: 12px;
   }
@@ -73,7 +94,8 @@
 
   .overlay h2 { color: #ffd200; font-size: 26px; margin-bottom: 4px;
     text-shadow: 0 0 30px rgba(255,210,0,0.2); }
-  .overlay p { color: rgba(255,255,255,0.5); font-size: 13px; margin-bottom: 18px; text-align: center; }
+  .overlay h2.danger { color: #e74c3c; text-shadow: 0 0 30px rgba(231,76,60,0.3); }
+  .overlay p { color: rgba(255,255,255,0.5); font-size: 13px; margin-bottom: 18px; text-align: center; line-height: 1.5; }
   .overlay button {
     background: linear-gradient(135deg, #f7971e, #ffd200);
     border: none; color: #1a1a2e; font-weight: 700; font-size: 15px;
@@ -114,6 +136,17 @@
     font-weight: 600;
     margin-left: 6px;
   }
+
+  .time-bonus { color: #2ecc71; font-size: 14px; font-weight: 600; }
+
+  .pulse-icon {
+    display: inline-block;
+    animation: pulse 0.8s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.15); opacity: 0.7; }
+  }
 </style>
 </head>
 <body>
@@ -121,6 +154,14 @@
   <div id="header">
     <h1>✧ Sortopia</h1>
     <div class="stat">Lv <span id="level-num">1</span> · Moves <span id="moves-count">0</span></div>
+  </div>
+  <div id="timer-text">
+    <span class="pulse-icon" id="timer-icon">⏱</span>
+    <span class="num" id="timer-display">60</span>
+    <span class="label">sec</span>
+  </div>
+  <div id="timer-bar-wrap">
+    <div id="timer-bar"></div>
   </div>
   <canvas id="canvas" width="600" height="600"></canvas>
   <div id="footer">
@@ -149,13 +190,22 @@
     <div class="star-rating" id="win-stars">★★★</div>
     <h2>✦ Sorted!</h2>
     <p id="win-msg">Perfect!</p>
+    <p id="time-bonus-text"></p>
     <button id="next-btn">Next Level ▶</button>
+  </div>
+
+  <!-- Time's up overlay -->
+  <div class="overlay" id="timeup-overlay">
+    <h2 class="danger">⏰ Time's Up!</h2>
+    <p>You ran out of time!<br>Try again — you're getting faster!</p>
+    <p id="timeup-progress"></p>
+    <button id="timeup-retry-btn">⟳ Try Again</button>
   </div>
 </div>
 
 <script>
 // ============================================================
-//  SORTOPIA — Water Sort Puzzle with Merge Mechanic
+//  SORTOPIA — Water Sort Puzzle with Merge Mechanic + Timer
 // ============================================================
 
 const canvas = document.getElementById('canvas');
@@ -179,6 +229,15 @@ const newColorSwatch = document.getElementById('new-color-swatch');
 const newColorName = document.getElementById('new-color-name');
 const newColorDesc = document.getElementById('new-color-desc');
 const continueMergeBtn = document.getElementById('continue-merge-btn');
+
+// Timer DOM refs
+const timerDisplay = document.getElementById('timer-display');
+const timerBar = document.getElementById('timer-bar');
+const timerIcon = document.getElementById('timer-icon');
+const timeBonusText = document.getElementById('time-bonus-text');
+const timeupOverlay = document.getElementById('timeup-overlay');
+const timeupRetryBtn = document.getElementById('timeup-retry-btn');
+const timeupProgress = document.getElementById('timeup-progress');
 
 // ---- Color palette ----
 const COLORS = [
@@ -208,6 +267,15 @@ const MERGE_RECIPES = {
 
 const TUBE_HEIGHT = 4;
 
+// ---- Timer config ----
+function getLevelTime(level, numColors) {
+  // Base time decreases as colors increase
+  const base = 60;
+  const penalty = (numColors - 3) * 8;      // -8s per extra color
+  const levelShrink = Math.floor((level - 1) / 3) * 3;  // -3s every 3 levels
+  return Math.max(30, base - penalty - levelShrink);
+}
+
 // ---- Game state ----
 let state = {
   tubes: [],
@@ -218,7 +286,11 @@ let state = {
   mergedColors: [],
   isAnimating: false,
   levelCompleted: false,
-  tubeCount: 0, // computed per level
+  tubeCount: 0,
+  timeLeft: 60,
+  totalTime: 60,
+  timerActive: false,
+  timerFrozen: false,
 };
 
 // ---- Layout helpers ----
@@ -265,7 +337,6 @@ function generateLevel(level, colors, merged) {
       const idx = i * TUBE_HEIGHT + j;
       tube.push(idx < units.length ? units[idx] : -1);
     }
-    // Sink empties
     tube.sort((a, b) => (b === -1 ? -1 : 0) - (a === -1 ? -1 : 0));
     tubes.push(tube);
   }
@@ -277,7 +348,6 @@ function generateLevel(level, colors, merged) {
   });
 
   if (isSolved && tubes.length >= 2) {
-    // Swap two random non-empty units between different tubes
     const nonEmptyTubes = tubes.filter(t => t.some(u => u !== -1));
     if (nonEmptyTubes.length >= 2) {
       const a = nonEmptyTubes[0];
@@ -290,7 +360,9 @@ function generateLevel(level, colors, merged) {
     }
   }
 
-  return { tubes, colorsInUse: activeColors, tubeCount: totalTubes };
+  const totalTime = getLevelTime(level, activeColors.length);
+
+  return { tubes, colorsInUse: activeColors, tubeCount: totalTubes, totalTime, timeLeft: totalTime };
 }
 
 // ---- Pour logic ----
@@ -403,12 +475,10 @@ function drawTube(x, y, tube, highlight) {
 
   ctx.save();
 
-  // Shadow
   ctx.shadowColor = 'rgba(0,0,0,0.25)';
   ctx.shadowBlur = 10;
   ctx.shadowOffsetY = 3;
 
-  // Tube body
   const grad = ctx.createLinearGradient(x, y, x, y + h);
   grad.addColorStop(0, 'rgba(255,255,255,0.07)');
   grad.addColorStop(0.5, 'rgba(255,255,255,0.02)');
@@ -438,13 +508,11 @@ function drawTube(x, y, tube, highlight) {
     ctx.shadowColor = 'transparent';
   }
 
-  // Glass shine
   ctx.fillStyle = 'rgba(255,255,255,0.05)';
   ctx.beginPath();
   if (ctx.roundRect) ctx.roundRect(x + 4, y + 3, w/4, h - 6, 3);
   ctx.fill();
 
-  // Draw liquid layers
   const innerX = x + 5;
   const innerW = w - 10;
   const segH = (h - 16) / TUBE_HEIGHT;
@@ -460,7 +528,6 @@ function drawTube(x, y, tube, highlight) {
     const segY = topY + (TUBE_HEIGHT - 1 - i) * segH;
     const isTop = (i === tube.findIndex(u => u !== -1));
 
-    // Liquid body
     const lg = ctx.createLinearGradient(innerX, segY, innerX, segY + segH);
     lg.addColorStop(0, lighten(hex, 15));
     lg.addColorStop(0.3, hex);
@@ -486,7 +553,6 @@ function drawTube(x, y, tube, highlight) {
     ctx.closePath();
     ctx.fill();
 
-    // Highlight on each segment
     ctx.fillStyle = 'rgba(255,255,255,0.12)';
     ctx.beginPath();
     if (ctx.roundRect) ctx.roundRect(innerX + 3, segY + 2, innerW * 0.2, segH - 4, 2);
@@ -495,7 +561,6 @@ function drawTube(x, y, tube, highlight) {
 
   ctx.restore();
 
-  // Rim
   ctx.strokeStyle = 'rgba(255,255,255,0.08)';
   ctx.lineWidth = 1.2;
   ctx.beginPath();
@@ -555,7 +620,7 @@ function drawPourAnim() {
 
 // ---- Input ----
 function handleTap(mx, my) {
-  if (state.isAnimating || state.levelCompleted) return;
+  if (state.isAnimating || state.levelCompleted || state.timerFrozen) return;
   const { TUBE_W } = computeLayout(state.tubeCount);
   const TUBE_H = 175;
   const BASE_Y = 195;
@@ -563,6 +628,7 @@ function handleTap(mx, my) {
   for (let i = 0; i < state.tubeCount; i++) {
     const tx = getTubeX(i);
     if (mx >= tx && mx <= tx + TUBE_W && my >= BASE_Y && my <= BASE_Y + TUBE_H) {
+      state.timerActive = true;  // First tap starts the clock
       if (state.selectedTube === -1) {
         if (state.tubes[i] && state.tubes[i].some(u => u !== -1)) {
           state.selectedTube = i;
@@ -574,7 +640,10 @@ function handleTap(mx, my) {
           movesCount.textContent = state.moves;
           startPourAnimation(state.selectedTube, i);
           state.selectedTube = -1;
-          if (checkWin()) setTimeout(showWin, 350);
+          if (checkWin()) {
+            state.timerFrozen = true;
+            setTimeout(showWin, 350);
+          }
         } else {
           state.selectedTube = (state.tubes[i] && state.tubes[i].some(u => u !== -1)) ? i : -1;
         }
@@ -601,25 +670,105 @@ canvas.addEventListener('touchstart', (e) => {
   handleTap((t.clientX - rect.left) * s, (t.clientY - rect.top) * s);
 }, { passive: false });
 
+// ---- Timer ----
+function updateTimer() {
+  if (state.levelCompleted || state.timerFrozen || !state.timerActive) return;
+  state.timeLeft -= 1/60; // ~1 second per 60 frames at 60fps
+
+  if (state.timeLeft <= 0) {
+    state.timeLeft = 0;
+    state.timerFrozen = true;
+    state.levelCompleted = true;
+    showTimeUp();
+  }
+
+  renderTimerUI();
+}
+
+function renderTimerUI() {
+  const pct = Math.max(0, (state.timeLeft / state.totalTime) * 100);
+  timerBar.style.width = pct + '%';
+
+  // Color: green → yellow → red
+  if (pct > 50) {
+    timerBar.style.background = 'linear-gradient(90deg, #2ecc71, #f1c40f)';
+    timerBar.classList.remove('urgent');
+  } else if (pct > 20) {
+    timerBar.style.background = 'linear-gradient(90deg, #f1c40f, #e67e22)';
+    timerBar.classList.remove('urgent');
+  } else {
+    timerBar.style.background = '#e74c3c';
+    timerBar.classList.add('urgent');
+  }
+
+  timerDisplay.textContent = Math.ceil(state.timeLeft);
+
+  // Pulse icon when low
+  if (pct <= 20 && pct > 0) {
+    timerIcon.style.display = 'inline-block';
+  } else {
+    timerIcon.style.display = 'inline-block';
+  }
+}
+
+function showTimeUp() {
+  // Count how many tubes are fully sorted
+  const sorted = getSortedColors().length;
+  const total = state.colorsInUse.length + state.mergedColors.length;
+  timeupProgress.textContent = `Sorted ${sorted}/${total} colors`;
+  timeupOverlay.classList.add('show');
+}
+
+timeupRetryBtn.addEventListener('click', () => {
+  timeupOverlay.classList.remove('show');
+  resetLevel();
+});
+
 // ---- UI ----
 function updateUI() {
   levelNum.textContent = state.level;
   movesCount.textContent = state.moves;
   const total = state.colorsInUse.length + state.mergedColors.length;
   colorCount.textContent = total + ' color' + (total > 1 ? 's' : '');
+  renderTimerUI();
 }
 
 // ---- Win ----
 function showWin() {
   state.levelCompleted = true;
+
   const m = state.moves;
+  const t = state.timeLeft;
+  const pctLeft = t / state.totalTime;
+
+  // Star rating: moves-based (1-3) + time bonus
   let stars = 1;
   if (m <= 8) stars = 3;
   else if (m <= 14) stars = 2;
-  winStars.textContent = '★'.repeat(stars) + '☆'.repeat(3 - stars);
-  winMsg.textContent = stars === 3 ? 'Flawless!' : stars === 2 ? 'Great sort!' : 'Sorted!';
+
+  // Time bonus: extra star if >40% time remaining
+  const timeStar = pctLeft > 0.4;
+  const displayStars = timeStar ? Math.min(3, stars + 1) : stars;
+
+  winStars.textContent = '★'.repeat(displayStars) + '☆'.repeat(3 - displayStars);
+
+  let msg = '';
+  if (displayStars === 3 && timeStar) msg = '✦ Lightning fast!';
+  else if (displayStars === 3) msg = 'Flawless!';
+  else if (displayStars === 2) msg = 'Great sort!';
+  else msg = 'Sorted!';
+  winMsg.textContent = msg;
+
+  if (timeStar) {
+    timeBonusText.innerHTML = `<span class="time-bonus">⏱ +${Math.ceil(t)}s time bonus!</span>`;
+    timeBonusText.style.display = 'block';
+  } else {
+    timeBonusText.style.display = 'none';
+  }
+
   const next = state.level + 1;
   if (next % 5 === 0) winMsg.textContent += ' ✦ Merge next!';
+
   winOverlay.classList.add('show');
 }
 
@@ -629,6 +778,8 @@ nextBtn.addEventListener('click', () => {
   state.moves = 0;
   state.selectedTube = -1;
   state.levelCompleted = false;
+  state.timerActive = false;
+  state.timerFrozen = false;
   if (state.level % 5 === 0) {
     showMergeScreen();
   } else {
@@ -642,13 +793,14 @@ nextBtn.addEventListener('click', () => {
 function showMergeScreen() {
   const avail = getAvailableMerges();
   if (avail.length === 0) {
-    // Skip merge if no options
     state.level++;
     const gen = generateLevel(state.level, state.colorsInUse, state.mergedColors);
     Object.assign(state, gen);
     state.moves = 0;
     state.selectedTube = -1;
     state.levelCompleted = false;
+    state.timerActive = false;
+    state.timerFrozen = false;
     updateUI();
     return;
   }
@@ -701,7 +853,6 @@ mergeBtn.addEventListener('click', () => {
   newColorDesc.textContent = `${COLORS[recipe.parent1].name} + ${COLORS[recipe.parent2].name} → ${r.name}`;
   mergeResult.classList.add('show');
 
-  // Store pending merge
   mergeResult.dataset.p1 = recipe.parent1;
   mergeResult.dataset.p2 = recipe.parent2;
   mergeResult.dataset.rid = r.id;
@@ -719,10 +870,29 @@ continueMergeBtn.addEventListener('click', () => {
   state.moves = 0;
   state.selectedTube = -1;
   state.levelCompleted = false;
+  state.timerActive = false;
+  state.timerFrozen = false;
   const gen = generateLevel(state.level, state.colorsInUse, state.mergedColors);
   Object.assign(state, gen);
   updateUI();
 });
+
+// ---- Reset ----
+function resetLevel() {
+  state.moves = 0;
+  state.selectedTube = -1;
+  state.levelCompleted = false;
+  state.isAnimating = false;
+  state.timerActive = false;
+  state.timerFrozen = false;
+  animating = false;
+  document.querySelectorAll('.overlay').forEach(o => o.classList.remove('show'));
+  const gen = generateLevel(state.level, state.colorsInUse, state.mergedColors);
+  Object.assign(state, gen);
+  updateUI();
+}
+
+resetBtn.addEventListener('click', resetLevel);
 
 // ---- Utils ----
 function lighten(hex, amt) {
@@ -740,26 +910,23 @@ function darken(hex, amt) {
   return `rgb(${r},${g},${b})`;
 }
 
-// ---- Reset ----
-resetBtn.addEventListener('click', () => {
-  state.moves = 0;
-  state.selectedTube = -1;
-  state.levelCompleted = false;
-  state.isAnimating = false;
-  animating = false;
-  document.querySelectorAll('.overlay').forEach(o => o.classList.remove('show'));
-  const gen = generateLevel(state.level, state.colorsInUse, state.mergedColors);
-  Object.assign(state, gen);
-  updateUI();
-});
-
 // ---- Game loop ----
 let lastTime = 0;
+let timerAccum = 0;
 
 function loop(time) {
   const dt = lastTime ? Math.min((time - lastTime) / 1000, 0.05) : 0.016;
   lastTime = time;
+
   if (animating) updateAnimation(dt);
+
+  // Timer ticks every ~1s (accumulate dt)
+  timerAccum += dt;
+  if (timerAccum >= 1/60) {
+    timerAccum -= 1/60;
+    updateTimer();
+  }
+
   render();
   requestAnimationFrame(loop);
 }
@@ -803,11 +970,14 @@ function init() {
     selectedTube: -1,
     levelCompleted: false,
     isAnimating: false,
+    timerActive: false,
+    timerFrozen: false,
   });
   const gen = generateLevel(1, state.colorsInUse, state.mergedColors);
   Object.assign(state, gen);
   animating = false;
   lastTime = 0;
+  timerAccum = 0;
   updateUI();
   requestAnimationFrame(loop);
 }
@@ -830,7 +1000,7 @@ if (!CanvasRenderingContext2D.prototype.roundRect) {
 }
 
 init();
-console.log('🧪 Sortopia ready! Tap a tube to select, tap another to pour. Every 5th level = merge!');
+console.log('🧪 Sortopia ready! Timer active — race the clock!');
 </script>
 </body>
 </html>

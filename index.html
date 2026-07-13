@@ -1,0 +1,836 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Sortopia — Water Sort + Merge</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body {
+    background: linear-gradient(145deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+    min-height: 100vh; display: flex; justify-content: center; align-items: center;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    touch-action: none; user-select: none; overflow: hidden;
+  }
+  #game {
+    background: rgba(255,255,255,0.04);
+    border-radius: 32px;
+    padding: 20px;
+    max-width: 480px;
+    width: 100%;
+    margin: 10px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    backdrop-filter: blur(8px);
+    position: relative;
+  }
+  #header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 4px 8px 12px;
+    color: #fff;
+  }
+  #header h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.5px;
+    background: linear-gradient(135deg, #f7971e, #ffd200);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  #header .stat { font-size: 12px; opacity: 0.7; }
+  #header .stat span { opacity: 1; font-weight: 600; }
+  canvas {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1;
+    border-radius: 20px;
+    background: radial-gradient(ellipse at 50% 20%, #1a1a3e, #0d0d1a);
+    cursor: pointer;
+    touch-action: none;
+  }
+  #footer {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 12px 6px 4px;
+    color: rgba(255,255,255,0.5);
+    font-size: 12px;
+  }
+  #footer button {
+    background: linear-gradient(135deg, #f7971e, #ffd200);
+    border: none; color: #1a1a2e; font-weight: 700; font-size: 13px;
+    padding: 7px 22px; border-radius: 30px; cursor: pointer;
+    transition: transform 0.12s;
+  }
+  #footer button:active { transform: scale(0.93); }
+
+  .overlay {
+    display: none;
+    position: absolute; inset: 0;
+    background: rgba(0,0,0,0.75);
+    backdrop-filter: blur(6px);
+    border-radius: 32px;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    z-index: 10;
+    padding: 30px;
+  }
+  .overlay.show { display: flex; }
+
+  .overlay h2 { color: #ffd200; font-size: 26px; margin-bottom: 4px;
+    text-shadow: 0 0 30px rgba(255,210,0,0.2); }
+  .overlay p { color: rgba(255,255,255,0.5); font-size: 13px; margin-bottom: 18px; text-align: center; }
+  .overlay button {
+    background: linear-gradient(135deg, #f7971e, #ffd200);
+    border: none; color: #1a1a2e; font-weight: 700; font-size: 15px;
+    padding: 10px 36px; border-radius: 30px; cursor: pointer;
+    transition: transform 0.12s;
+  }
+  .overlay button:active { transform: scale(0.95); }
+  .overlay button:disabled { opacity: 0.3; cursor: default; transform: none; }
+
+  .merge-options { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin-bottom: 16px; }
+  .merge-card {
+    background: rgba(255,255,255,0.06);
+    border: 2px solid rgba(255,255,255,0.1);
+    border-radius: 14px; padding: 14px 18px;
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    cursor: pointer; transition: all 0.2s;
+    min-width: 90px;
+  }
+  .merge-card:hover { border-color: #ffd200; background: rgba(255,210,0,0.1); }
+  .merge-card:active { transform: scale(0.95); }
+  .merge-card .pair { display: flex; align-items: center; gap: 6px; }
+  .merge-card .swatch { width: 36px; height: 36px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.15); }
+  .merge-card .label { color: #fff; font-size: 12px; font-weight: 600; }
+  .merge-card .sub { color: rgba(255,255,255,0.4); font-size: 11px; }
+
+  .star-rating { color: #ffd200; font-size: 28px; letter-spacing: 6px; margin-bottom: 8px; }
+
+  .result-swatch { width: 72px; height: 72px; border-radius: 50%; border: 3px solid rgba(255,255,255,0.2);
+    margin-bottom: 14px; box-shadow: 0 0 40px rgba(255,210,0,0.15); }
+
+  .badge {
+    display: inline-block;
+    background: rgba(255,210,0,0.15);
+    color: #ffd200;
+    font-size: 10px;
+    padding: 2px 10px;
+    border-radius: 20px;
+    font-weight: 600;
+    margin-left: 6px;
+  }
+</style>
+</head>
+<body>
+<div id="game">
+  <div id="header">
+    <h1>✧ Sortopia</h1>
+    <div class="stat">Lv <span id="level-num">1</span> · Moves <span id="moves-count">0</span></div>
+  </div>
+  <canvas id="canvas" width="600" height="600"></canvas>
+  <div id="footer">
+    <span id="color-count">3 colors</span>
+    <button id="reset-btn">⟳ Reset</button>
+  </div>
+
+  <!-- Merge screen -->
+  <div class="overlay" id="merge-overlay">
+    <h2>✦ Merge!</h2>
+    <p>Pick two sorted colors to create a new one</p>
+    <div class="merge-options" id="merge-options"></div>
+    <button id="merge-btn" disabled>Merge Selected</button>
+  </div>
+
+  <!-- Merge result -->
+  <div class="overlay" id="merge-result">
+    <div class="result-swatch" id="new-color-swatch"></div>
+    <h2 id="new-color-name">New Color!</h2>
+    <p id="new-color-desc">Unlocked!</p>
+    <button id="continue-merge-btn">Continue ▶</button>
+  </div>
+
+  <!-- Win overlay -->
+  <div class="overlay" id="win-overlay">
+    <div class="star-rating" id="win-stars">★★★</div>
+    <h2>✦ Sorted!</h2>
+    <p id="win-msg">Perfect!</p>
+    <button id="next-btn">Next Level ▶</button>
+  </div>
+</div>
+
+<script>
+// ============================================================
+//  SORTOPIA — Water Sort Puzzle with Merge Mechanic
+// ============================================================
+
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const W = 600, H = 600;
+
+// DOM refs
+const levelNum = document.getElementById('level-num');
+const movesCount = document.getElementById('moves-count');
+const colorCount = document.getElementById('color-count');
+const resetBtn = document.getElementById('reset-btn');
+const winOverlay = document.getElementById('win-overlay');
+const winStars = document.getElementById('win-stars');
+const winMsg = document.getElementById('win-msg');
+const nextBtn = document.getElementById('next-btn');
+const mergeOverlay = document.getElementById('merge-overlay');
+const mergeOptions = document.getElementById('merge-options');
+const mergeBtn = document.getElementById('merge-btn');
+const mergeResult = document.getElementById('merge-result');
+const newColorSwatch = document.getElementById('new-color-swatch');
+const newColorName = document.getElementById('new-color-name');
+const newColorDesc = document.getElementById('new-color-desc');
+const continueMergeBtn = document.getElementById('continue-merge-btn');
+
+// ---- Color palette ----
+const COLORS = [
+  { id: 0, name: 'Crimson', hex: '#e74c3c' },
+  { id: 1, name: 'Ocean',   hex: '#3498db' },
+  { id: 2, name: 'Emerald', hex: '#2ecc71' },
+  { id: 3, name: 'Amber',   hex: '#f39c12' },
+  { id: 4, name: 'Plum',    hex: '#9b59b6' },
+  { id: 5, name: 'Coral',   hex: '#e67e22' },
+  { id: 6, name: 'Teal',    hex: '#1abc9c' },
+  { id: 7, name: 'Rose',    hex: '#fd79a8' },
+  { id: 8, name: 'Mint',    hex: '#00b894' },
+  { id: 9, name: 'Lavender',hex: '#a29bfe' },
+  { id: 10,name: 'Peach',   hex: '#fab1a0' },
+  { id: 11,name: 'Sky',     hex: '#74b9ff' },
+];
+
+// Merge recipes: parent1_parent2 → {id, name}
+const MERGE_RECIPES = {
+  '0_2':  { id: 8,  name: 'Mint'     },
+  '1_3':  { id: 10, name: 'Peach'    },
+  '0_1':  { id: 11, name: 'Sky'      },
+  '2_3':  { id: 6,  name: 'Teal'     },
+  '4_0':  { id: 7,  name: 'Rose'     },
+  '4_2':  { id: 9,  name: 'Lavender' },
+};
+
+const TUBE_HEIGHT = 4;
+
+// ---- Game state ----
+let state = {
+  tubes: [],
+  selectedTube: -1,
+  moves: 0,
+  level: 1,
+  colorsInUse: [0, 1, 2],
+  mergedColors: [],
+  isAnimating: false,
+  levelCompleted: false,
+  tubeCount: 0, // computed per level
+};
+
+// ---- Layout helpers ----
+function computeLayout(tubeCount) {
+  const TUBE_W = 52;
+  const TUBE_GAP = 10;
+  const totalW = tubeCount * TUBE_W + (tubeCount - 1) * TUBE_GAP;
+  const startX = (W - totalW) / 2;
+  return { TUBE_W, TUBE_GAP, startX };
+}
+
+function getTubeX(i) {
+  const { TUBE_W, TUBE_GAP, startX } = computeLayout(state.tubeCount);
+  return startX + i * (TUBE_W + TUBE_GAP);
+}
+
+// ---- Level generation ----
+function generateLevel(level, colors, merged) {
+  const allColors = [...colors, ...merged];
+  const numColors = Math.min(allColors.length, 6);
+  const activeColors = allColors.slice(0, numColors);
+
+  const emptyCount = 2;
+  const fullCount = activeColors.length;
+  const totalTubes = fullCount + emptyCount;
+
+  // Build units
+  let units = [];
+  for (let c of activeColors) {
+    for (let j = 0; j < TUBE_HEIGHT; j++) units.push(c);
+  }
+
+  // Shuffle
+  for (let i = units.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [units[i], units[j]] = [units[j], units[i]];
+  }
+
+  // Distribute into tubes
+  const tubes = [];
+  for (let i = 0; i < totalTubes; i++) {
+    const tube = [];
+    for (let j = 0; j < TUBE_HEIGHT; j++) {
+      const idx = i * TUBE_HEIGHT + j;
+      tube.push(idx < units.length ? units[idx] : -1);
+    }
+    // Sink empties
+    tube.sort((a, b) => (b === -1 ? -1 : 0) - (a === -1 ? -1 : 0));
+    tubes.push(tube);
+  }
+
+  // Regenerate if solved by accident
+  const isSolved = tubes.every(t => {
+    const ne = t.filter(u => u !== -1);
+    return ne.length === 0 || (ne.length === TUBE_HEIGHT && ne.every(u => u === ne[0]));
+  });
+
+  if (isSolved && tubes.length >= 2) {
+    // Swap two random non-empty units between different tubes
+    const nonEmptyTubes = tubes.filter(t => t.some(u => u !== -1));
+    if (nonEmptyTubes.length >= 2) {
+      const a = nonEmptyTubes[0];
+      const b = nonEmptyTubes[1];
+      const ia = a.findIndex(u => u !== -1);
+      const ib = b.findIndex(u => u !== -1);
+      [a[ia], b[ib]] = [b[ib], a[ia]];
+      a.sort((x,y) => (y === -1 ? -1 : 0) - (x === -1 ? -1 : 0));
+      b.sort((x,y) => (y === -1 ? -1 : 0) - (x === -1 ? -1 : 0));
+    }
+  }
+
+  return { tubes, colorsInUse: activeColors, tubeCount: totalTubes };
+}
+
+// ---- Pour logic ----
+function canPour(srcIdx, dstIdx) {
+  if (srcIdx === dstIdx) return false;
+  const src = state.tubes[srcIdx];
+  const dst = state.tubes[dstIdx];
+  if (!src || !dst) return false;
+  const srcTopIdx = src.findIndex(u => u !== -1);
+  if (srcTopIdx === -1) return false;
+  const srcTop = src[srcTopIdx];
+  const dstEmpty = dst.filter(u => u === -1).length;
+  if (dstEmpty === 0) return false;
+
+  let count = 0;
+  for (let i = srcTopIdx; i < TUBE_HEIGHT; i++) {
+    if (src[i] === srcTop) count++;
+    else break;
+  }
+  const dstTopIdx = dst.findIndex(u => u === -1);
+  const dstTop = dstTopIdx > 0 ? dst[dstTopIdx - 1] : -1;
+  if (dstTop !== -1 && dstTop !== srcTop) return false;
+  return Math.min(count, dstEmpty) > 0;
+}
+
+function executePour(srcIdx, dstIdx) {
+  const src = state.tubes[srcIdx];
+  const dst = state.tubes[dstIdx];
+  const srcTop = src.find(u => u !== -1);
+  const srcTopIdx = src.findIndex(u => u !== -1);
+  const dstEmpty = dst.filter(u => u === -1).length;
+
+  let count = 0;
+  for (let i = srcTopIdx; i < TUBE_HEIGHT; i++) {
+    if (src[i] === srcTop) count++;
+    else break;
+  }
+  const pourCount = Math.min(count, dstEmpty);
+
+  for (let i = 0; i < pourCount; i++) {
+    const si = srcTopIdx + i;
+    const di = dst.findIndex(u => u === -1);
+    dst[di] = src[si];
+    src[si] = -1;
+  }
+
+  src.sort((a,b) => (b === -1 ? -1 : 0) - (a === -1 ? -1 : 0));
+  dst.sort((a,b) => (b === -1 ? -1 : 0) - (a === -1 ? -1 : 0));
+  return pourCount;
+}
+
+function checkWin() {
+  return state.tubes.every(t => {
+    const ne = t.filter(u => u !== -1);
+    if (ne.length === 0) return true;
+    if (ne.length < TUBE_HEIGHT) return false;
+    return ne.every(u => u === ne[0]);
+  });
+}
+
+// ---- Merge ----
+function getSortedColors() {
+  const s = new Set();
+  for (let t of state.tubes) {
+    const ne = t.filter(u => u !== -1);
+    if (ne.length === TUBE_HEIGHT && ne.every(u => u === ne[0])) {
+      s.add(ne[0]);
+    }
+  }
+  return [...s];
+}
+
+function getAvailableMerges() {
+  const sorted = getSortedColors();
+  const recipes = [];
+  for (let [key, result] of Object.entries(MERGE_RECIPES)) {
+    const [p1, p2] = key.split('_').map(Number);
+    if (sorted.includes(p1) && sorted.includes(p2)) {
+      if (!state.mergedColors.includes(result.id) && !state.colorsInUse.includes(result.id)) {
+        recipes.push({ parent1: p1, parent2: p2, result });
+      }
+    }
+  }
+  return recipes;
+}
+
+function performMerge(p1, p2, result) {
+  let found1 = false, found2 = false;
+  for (let t of state.tubes) {
+    const ne = t.filter(u => u !== -1);
+    if (!found1 && ne.length === TUBE_HEIGHT && ne.every(u => u === p1)) {
+      t.fill(-1);
+      found1 = true;
+    } else if (!found2 && ne.length === TUBE_HEIGHT && ne.every(u => u === p2)) {
+      t.fill(-1);
+      found2 = true;
+    }
+    if (found1 && found2) break;
+  }
+  state.mergedColors.push(result.id);
+}
+
+// ---- Rendering ----
+function drawTube(x, y, tube, highlight) {
+  if (!tube) return;
+  const { TUBE_W, TUBE_GAP, startX } = computeLayout(state.tubeCount);
+  const w = TUBE_W;
+  const h = 175;
+  const r = 12;
+
+  ctx.save();
+
+  // Shadow
+  ctx.shadowColor = 'rgba(0,0,0,0.25)';
+  ctx.shadowBlur = 10;
+  ctx.shadowOffsetY = 3;
+
+  // Tube body
+  const grad = ctx.createLinearGradient(x, y, x, y + h);
+  grad.addColorStop(0, 'rgba(255,255,255,0.07)');
+  grad.addColorStop(0.5, 'rgba(255,255,255,0.02)');
+  grad.addColorStop(1, 'rgba(255,255,255,0.05)');
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+  ctx.fill();
+  ctx.shadowColor = 'transparent';
+
+  if (highlight) {
+    ctx.strokeStyle = 'rgba(255,210,0,0.7)';
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+    ctx.shadowColor = 'rgba(255,210,0,0.25)';
+    ctx.shadowBlur = 15;
+    ctx.stroke();
+    ctx.shadowColor = 'transparent';
+  }
+
+  // Glass shine
+  ctx.fillStyle = 'rgba(255,255,255,0.05)';
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(x + 4, y + 3, w/4, h - 6, 3);
+  ctx.fill();
+
+  // Draw liquid layers
+  const innerX = x + 5;
+  const innerW = w - 10;
+  const segH = (h - 16) / TUBE_HEIGHT;
+  const topY = y + 10;
+
+  for (let i = TUBE_HEIGHT - 1; i >= 0; i--) {
+    const cid = tube[i];
+    if (cid === -1) continue;
+    const color = [...state.colorsInUse, ...state.mergedColors, ...COLORS.map(c => c.id)].includes(cid)
+      ? COLORS[cid] || { hex: '#888' } : { hex: '#888' };
+    const hex = color.hex;
+
+    const segY = topY + (TUBE_HEIGHT - 1 - i) * segH;
+    const isTop = (i === tube.findIndex(u => u !== -1));
+
+    // Liquid body
+    const lg = ctx.createLinearGradient(innerX, segY, innerX, segY + segH);
+    lg.addColorStop(0, lighten(hex, 15));
+    lg.addColorStop(0.3, hex);
+    lg.addColorStop(0.8, hex);
+    lg.addColorStop(1, darken(hex, 10));
+    ctx.fillStyle = lg;
+
+    ctx.beginPath();
+    if (isTop) {
+      const waveAmp = 2.5;
+      ctx.moveTo(innerX, segY + waveAmp);
+      for (let px = 0; px <= innerW; px += 5) {
+        const wave = Math.sin(px * 0.12 + Date.now() * 0.0015) * waveAmp;
+        ctx.lineTo(innerX + px, segY + wave);
+      }
+      ctx.lineTo(innerX + innerW, segY);
+    } else {
+      ctx.moveTo(innerX, segY);
+      ctx.lineTo(innerX + innerW, segY);
+    }
+    ctx.lineTo(innerX + innerW, segY + segH);
+    ctx.lineTo(innerX, segY + segH);
+    ctx.closePath();
+    ctx.fill();
+
+    // Highlight on each segment
+    ctx.fillStyle = 'rgba(255,255,255,0.12)';
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(innerX + 3, segY + 2, innerW * 0.2, segH - 4, 2);
+    ctx.fill();
+  }
+
+  ctx.restore();
+
+  // Rim
+  ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.stroke();
+}
+
+// ---- Animation ----
+let animating = false;
+let animData = { srcIdx: -1, dstIdx: -1, progress: 0 };
+
+function startPourAnimation(srcIdx, dstIdx) {
+  animating = true;
+  animData = { srcIdx, dstIdx, progress: 0 };
+  state.isAnimating = true;
+}
+
+function updateAnimation(dt) {
+  if (!animating) return;
+  animData.progress += dt * 2.2;
+  if (animData.progress >= 1) {
+    animating = false;
+    state.isAnimating = false;
+  }
+}
+
+function drawPourAnim() {
+  if (!animating) return;
+  const srcX = getTubeX(animData.srcIdx) + computeLayout(state.tubeCount).TUBE_W / 2;
+  const srcY = 195;
+  const dstX = getTubeX(animData.dstIdx) + computeLayout(state.tubeCount).TUBE_W / 2;
+  const dstY = 195;
+  const p = animData.progress;
+  const midY = Math.min(srcY, dstY) - 50;
+  const t = p;
+  const cx = srcX + (dstX - srcX) * t;
+  const cy = t < 0.5
+    ? srcY + (midY - srcY) * (t * 2)
+    : midY + (dstY - midY) * ((t - 0.5) * 2);
+
+  ctx.save();
+  ctx.fillStyle = `rgba(255,255,255,${0.4 * (1 - p * 0.5)})`;
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, 5 - p * 2, 7 - p * 3, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  if (p > 0.6) {
+    const sp = (p - 0.6) / 0.4;
+    ctx.fillStyle = `rgba(255,255,255,${0.2 * (1 - sp)})`;
+    ctx.beginPath();
+    ctx.ellipse(dstX, dstY + 8, 10 * sp, 3 * sp, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+// ---- Input ----
+function handleTap(mx, my) {
+  if (state.isAnimating || state.levelCompleted) return;
+  const { TUBE_W } = computeLayout(state.tubeCount);
+  const TUBE_H = 175;
+  const BASE_Y = 195;
+
+  for (let i = 0; i < state.tubeCount; i++) {
+    const tx = getTubeX(i);
+    if (mx >= tx && mx <= tx + TUBE_W && my >= BASE_Y && my <= BASE_Y + TUBE_H) {
+      if (state.selectedTube === -1) {
+        if (state.tubes[i] && state.tubes[i].some(u => u !== -1)) {
+          state.selectedTube = i;
+        }
+      } else {
+        if (canPour(state.selectedTube, i)) {
+          executePour(state.selectedTube, i);
+          state.moves++;
+          movesCount.textContent = state.moves;
+          startPourAnimation(state.selectedTube, i);
+          state.selectedTube = -1;
+          if (checkWin()) setTimeout(showWin, 350);
+        } else {
+          state.selectedTube = (state.tubes[i] && state.tubes[i].some(u => u !== -1)) ? i : -1;
+        }
+      }
+      updateUI();
+      return;
+    }
+  }
+  state.selectedTube = -1;
+  updateUI();
+}
+
+// Canvas events
+canvas.addEventListener('click', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const s = canvas.width / rect.width;
+  handleTap((e.clientX - rect.left) * s, (e.clientY - rect.top) * s);
+});
+canvas.addEventListener('touchstart', (e) => {
+  e.preventDefault();
+  const t = e.touches[0];
+  const rect = canvas.getBoundingClientRect();
+  const s = canvas.width / rect.width;
+  handleTap((t.clientX - rect.left) * s, (t.clientY - rect.top) * s);
+}, { passive: false });
+
+// ---- UI ----
+function updateUI() {
+  levelNum.textContent = state.level;
+  movesCount.textContent = state.moves;
+  const total = state.colorsInUse.length + state.mergedColors.length;
+  colorCount.textContent = total + ' color' + (total > 1 ? 's' : '');
+}
+
+// ---- Win ----
+function showWin() {
+  state.levelCompleted = true;
+  const m = state.moves;
+  let stars = 1;
+  if (m <= 8) stars = 3;
+  else if (m <= 14) stars = 2;
+  winStars.textContent = '★'.repeat(stars) + '☆'.repeat(3 - stars);
+  winMsg.textContent = stars === 3 ? 'Flawless!' : stars === 2 ? 'Great sort!' : 'Sorted!';
+  const next = state.level + 1;
+  if (next % 5 === 0) winMsg.textContent += ' ✦ Merge next!';
+  winOverlay.classList.add('show');
+}
+
+nextBtn.addEventListener('click', () => {
+  winOverlay.classList.remove('show');
+  state.level++;
+  state.moves = 0;
+  state.selectedTube = -1;
+  state.levelCompleted = false;
+  if (state.level % 5 === 0) {
+    showMergeScreen();
+  } else {
+    const gen = generateLevel(state.level, state.colorsInUse, state.mergedColors);
+    Object.assign(state, gen);
+    updateUI();
+  }
+});
+
+// ---- Merge ----
+function showMergeScreen() {
+  const avail = getAvailableMerges();
+  if (avail.length === 0) {
+    // Skip merge if no options
+    state.level++;
+    const gen = generateLevel(state.level, state.colorsInUse, state.mergedColors);
+    Object.assign(state, gen);
+    state.moves = 0;
+    state.selectedTube = -1;
+    state.levelCompleted = false;
+    updateUI();
+    return;
+  }
+
+  mergeOptions.innerHTML = '';
+  let selected = null;
+
+  avail.forEach((recipe, idx) => {
+    const card = document.createElement('div');
+    card.className = 'merge-card';
+    card.innerHTML = `
+      <div class="pair">
+        <div class="swatch" style="background:${COLORS[recipe.parent1].hex}"></div>
+        <span style="color:#ffd200;font-size:16px;">⟡</span>
+        <div class="swatch" style="background:${COLORS[recipe.parent2].hex}"></div>
+      </div>
+      <div class="label">${COLORS[recipe.parent1].name} + ${COLORS[recipe.parent2].name}</div>
+      <div class="sub">→ ${recipe.result.name}</div>
+    `;
+    card.dataset.idx = idx;
+    card.addEventListener('click', () => {
+      document.querySelectorAll('.merge-card').forEach(c => {
+        c.style.borderColor = 'rgba(255,255,255,0.1)';
+        c.style.background = 'rgba(255,255,255,0.06)';
+      });
+      card.style.borderColor = '#ffd200';
+      card.style.background = 'rgba(255,210,0,0.15)';
+      selected = recipe;
+      mergeBtn.disabled = false;
+    });
+    mergeOptions.appendChild(card);
+  });
+
+  mergeBtn.disabled = true;
+  mergeOverlay.classList.add('show');
+}
+
+mergeBtn.addEventListener('click', () => {
+  const sel = document.querySelector('.merge-card[style*="border-color: rgb(255, 210, 0)"]');
+  if (!sel) return;
+  const idx = parseInt(sel.dataset.idx);
+  const avail = getAvailableMerges();
+  const recipe = avail[idx];
+  if (!recipe) return;
+  mergeOverlay.classList.remove('show');
+
+  const r = recipe.result;
+  newColorSwatch.style.background = COLORS[r.id].hex;
+  newColorName.textContent = `✦ ${r.name} Unlocked!`;
+  newColorDesc.textContent = `${COLORS[recipe.parent1].name} + ${COLORS[recipe.parent2].name} → ${r.name}`;
+  mergeResult.classList.add('show');
+
+  // Store pending merge
+  mergeResult.dataset.p1 = recipe.parent1;
+  mergeResult.dataset.p2 = recipe.parent2;
+  mergeResult.dataset.rid = r.id;
+});
+
+continueMergeBtn.addEventListener('click', () => {
+  const p1 = parseInt(mergeResult.dataset.p1);
+  const p2 = parseInt(mergeResult.dataset.p2);
+  const rid = parseInt(mergeResult.dataset.rid);
+  const result = COLORS[rid];
+  if (result) performMerge(p1, p2, result);
+  mergeResult.classList.remove('show');
+
+  state.level++;
+  state.moves = 0;
+  state.selectedTube = -1;
+  state.levelCompleted = false;
+  const gen = generateLevel(state.level, state.colorsInUse, state.mergedColors);
+  Object.assign(state, gen);
+  updateUI();
+});
+
+// ---- Utils ----
+function lighten(hex, amt) {
+  const c = hex.replace('#','');
+  const r = Math.min(255, parseInt(c.substring(0,2),16) + amt);
+  const g = Math.min(255, parseInt(c.substring(2,4),16) + amt);
+  const b = Math.min(255, parseInt(c.substring(4,6),16) + amt);
+  return `rgb(${r},${g},${b})`;
+}
+function darken(hex, amt) {
+  const c = hex.replace('#','');
+  const r = Math.max(0, parseInt(c.substring(0,2),16) - amt);
+  const g = Math.max(0, parseInt(c.substring(2,4),16) - amt);
+  const b = Math.max(0, parseInt(c.substring(4,6),16) - amt);
+  return `rgb(${r},${g},${b})`;
+}
+
+// ---- Reset ----
+resetBtn.addEventListener('click', () => {
+  state.moves = 0;
+  state.selectedTube = -1;
+  state.levelCompleted = false;
+  state.isAnimating = false;
+  animating = false;
+  document.querySelectorAll('.overlay').forEach(o => o.classList.remove('show'));
+  const gen = generateLevel(state.level, state.colorsInUse, state.mergedColors);
+  Object.assign(state, gen);
+  updateUI();
+});
+
+// ---- Game loop ----
+let lastTime = 0;
+
+function loop(time) {
+  const dt = lastTime ? Math.min((time - lastTime) / 1000, 0.05) : 0.016;
+  lastTime = time;
+  if (animating) updateAnimation(dt);
+  render();
+  requestAnimationFrame(loop);
+}
+
+function render() {
+  ctx.clearRect(0, 0, W, H);
+
+  // Stars bg
+  ctx.fillStyle = 'rgba(255,255,255,0.015)';
+  for (let i = 0; i < 25; i++) {
+    const sx = (i * 41 + 17) % W;
+    const sy = (i * 67 + 11) % H;
+    ctx.beginPath();
+    ctx.arc(sx, sy, 1, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Draw tubes
+  for (let i = 0; i < state.tubeCount; i++) {
+    drawTube(getTubeX(i), 195, state.tubes[i], state.selectedTube === i);
+  }
+
+  drawPourAnim();
+
+  // Merge hint
+  if (state.level % 5 === 0 && !state.levelCompleted) {
+    ctx.fillStyle = 'rgba(255,210,0,0.25)';
+    ctx.font = '11px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('✦ Merge level — sort all colors to unlock!', W / 2, 385);
+  }
+}
+
+// ---- Init ----
+function init() {
+  Object.assign(state, {
+    level: 1,
+    moves: 0,
+    colorsInUse: [0, 1, 2],
+    mergedColors: [],
+    selectedTube: -1,
+    levelCompleted: false,
+    isAnimating: false,
+  });
+  const gen = generateLevel(1, state.colorsInUse, state.mergedColors);
+  Object.assign(state, gen);
+  animating = false;
+  lastTime = 0;
+  updateUI();
+  requestAnimationFrame(loop);
+}
+
+// roundRect polyfill
+if (!CanvasRenderingContext2D.prototype.roundRect) {
+  CanvasRenderingContext2D.prototype.roundRect = function(x, y, w, h, r) {
+    const rad = (typeof r === 'number' ? r : r[0]) || 0;
+    this.moveTo(x + rad, y);
+    this.lineTo(x + w - rad, y);
+    this.quadraticCurveTo(x + w, y, x + w, y + rad);
+    this.lineTo(x + w, y + h - rad);
+    this.quadraticCurveTo(x + w, y + h, x + w - rad, y + h);
+    this.lineTo(x + rad, y + h);
+    this.quadraticCurveTo(x, y + h, x, y + h - rad);
+    this.lineTo(x, y + rad);
+    this.quadraticCurveTo(x, y, x + rad, y);
+    return this;
+  };
+}
+
+init();
+console.log('🧪 Sortopia ready! Tap a tube to select, tap another to pour. Every 5th level = merge!');
+</script>
+</body>
+</html>

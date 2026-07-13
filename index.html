@@ -34,9 +34,15 @@
   #header .stat { font-size: 12px; opacity: 0.7; }
   #header .stat span { opacity: 1; font-weight: 600; }
 
+  #timer-area {
+    display: none;
+    margin-bottom: 4px;
+  }
+  #timer-area.show { display: block; }
+
   #timer-bar-wrap {
     width: 100%; height: 4px; background: rgba(255,255,255,0.06);
-    border-radius: 2px; margin-bottom: 6px; overflow: hidden;
+    border-radius: 2px; overflow: hidden;
   }
   #timer-bar {
     height: 100%; width: 100%;
@@ -49,7 +55,7 @@
   #timer-text {
     display: flex; justify-content: center; align-items: center;
     gap: 4px; font-size: 20px; font-weight: 700; letter-spacing: -0.5px;
-    margin-bottom: 4px;
+    margin-bottom: 2px;
   }
   #timer-text .num { color: #fff; }
   #timer-text .label { font-size: 11px; opacity: 0.5; font-weight: 400; }
@@ -95,6 +101,7 @@
   .overlay h2 { color: #ffd200; font-size: 26px; margin-bottom: 4px;
     text-shadow: 0 0 30px rgba(255,210,0,0.2); }
   .overlay h2.danger { color: #e74c3c; text-shadow: 0 0 30px rgba(231,76,60,0.3); }
+  .overlay h2.challenge { color: #f39c12; text-shadow: 0 0 30px rgba(243,156,18,0.3); }
   .overlay p { color: rgba(255,255,255,0.5); font-size: 13px; margin-bottom: 18px; text-align: center; line-height: 1.5; }
   .overlay button {
     background: linear-gradient(135deg, #f7971e, #ffd200);
@@ -139,13 +146,16 @@
 
   .time-bonus { color: #2ecc71; font-size: 14px; font-weight: 600; }
 
-  .pulse-icon {
+  .challenge-badge {
     display: inline-block;
-    animation: pulse 0.8s ease-in-out infinite;
-  }
-  @keyframes pulse {
-    0%, 100% { transform: scale(1); opacity: 1; }
-    50% { transform: scale(1.15); opacity: 0.7; }
+    background: linear-gradient(135deg, #f39c12, #e74c3c);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 20px;
+    margin-left: 6px;
+    letter-spacing: 0.5px;
   }
 </style>
 </head>
@@ -155,14 +165,19 @@
     <h1>✧ Sortopia</h1>
     <div class="stat">Lv <span id="level-num">1</span> · Moves <span id="moves-count">0</span></div>
   </div>
-  <div id="timer-text">
-    <span class="pulse-icon" id="timer-icon">⏱</span>
-    <span class="num" id="timer-display">60</span>
-    <span class="label">sec</span>
+
+  <!-- Timer area — only visible on challenge levels -->
+  <div id="timer-area">
+    <div id="timer-text">
+      <span>⏱</span>
+      <span class="num" id="timer-display">60</span>
+      <span class="label">sec</span>
+    </div>
+    <div id="timer-bar-wrap">
+      <div id="timer-bar"></div>
+    </div>
   </div>
-  <div id="timer-bar-wrap">
-    <div id="timer-bar"></div>
-  </div>
+
   <canvas id="canvas" width="600" height="600"></canvas>
   <div id="footer">
     <span id="color-count">3 colors</span>
@@ -197,15 +212,33 @@
   <!-- Time's up overlay -->
   <div class="overlay" id="timeup-overlay">
     <h2 class="danger">⏰ Time's Up!</h2>
-    <p>You ran out of time!<br>Try again — you're getting faster!</p>
+    <p>Don't worry — try the challenge again!</p>
     <p id="timeup-progress"></p>
     <button id="timeup-retry-btn">⟳ Try Again</button>
+  </div>
+
+  <!-- Challenge intro overlay -->
+  <div class="overlay" id="challenge-overlay">
+    <h2 class="challenge">⚡ Speed Challenge!</h2>
+    <p id="challenge-desc">Sort all colors before time runs out!<br>Beat the clock for bonus stars!</p>
+    <div style="display:flex;gap:20px;margin-bottom:16px;">
+      <div style="text-align:center;">
+        <div style="font-size:32px;color:#f39c12;font-weight:700;" id="challenge-time-display">45</div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.4);">seconds</div>
+      </div>
+      <div style="text-align:center;">
+        <div style="font-size:32px;color:#ffd200;font-weight:700;" id="challenge-colors-display">4</div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.4);">colors</div>
+      </div>
+    </div>
+    <button id="challenge-start-btn">▶ Start Challenge!</button>
   </div>
 </div>
 
 <script>
 // ============================================================
-//  SORTOPIA — Water Sort Puzzle with Merge Mechanic + Timer
+//  SORTOPIA — Water Sort Puzzle with Merge Mechanic
+//  Challenge levels every 10th level: timer + urgency
 // ============================================================
 
 const canvas = document.getElementById('canvas');
@@ -230,14 +263,21 @@ const newColorName = document.getElementById('new-color-name');
 const newColorDesc = document.getElementById('new-color-desc');
 const continueMergeBtn = document.getElementById('continue-merge-btn');
 
-// Timer DOM refs
+// Timer refs
+const timerArea = document.getElementById('timer-area');
 const timerDisplay = document.getElementById('timer-display');
 const timerBar = document.getElementById('timer-bar');
-const timerIcon = document.getElementById('timer-icon');
 const timeBonusText = document.getElementById('time-bonus-text');
 const timeupOverlay = document.getElementById('timeup-overlay');
 const timeupRetryBtn = document.getElementById('timeup-retry-btn');
 const timeupProgress = document.getElementById('timeup-progress');
+
+// Challenge overlay refs
+const challengeOverlay = document.getElementById('challenge-overlay');
+const challengeDesc = document.getElementById('challenge-desc');
+const challengeTimeDisplay = document.getElementById('challenge-time-display');
+const challengeColorsDisplay = document.getElementById('challenge-colors-display');
+const challengeStartBtn = document.getElementById('challenge-start-btn');
 
 // ---- Color palette ----
 const COLORS = [
@@ -267,13 +307,12 @@ const MERGE_RECIPES = {
 
 const TUBE_HEIGHT = 4;
 
-// ---- Timer config ----
-function getLevelTime(level, numColors) {
-  // Base time decreases as colors increase
-  const base = 60;
-  const penalty = (numColors - 3) * 8;      // -8s per extra color
-  const levelShrink = Math.floor((level - 1) / 3) * 3;  // -3s every 3 levels
-  return Math.max(30, base - penalty - levelShrink);
+// ---- Timer config (challenge levels only) ----
+function getChallengeTime(level, numColors) {
+  const base = 55;
+  const penalty = (numColors - 3) * 8;       // -8s per extra color
+  const levelBump = Math.floor(level / 10);  // harder every 10 levels
+  return Math.max(25, base - penalty - levelBump * 3);
 }
 
 // ---- Game state ----
@@ -287,10 +326,12 @@ let state = {
   isAnimating: false,
   levelCompleted: false,
   tubeCount: 0,
-  timeLeft: 60,
-  totalTime: 60,
+  // Timer (challenge levels only)
+  timeLeft: 0,
+  totalTime: 0,
   timerActive: false,
   timerFrozen: false,
+  challengeLevel: false,
 };
 
 // ---- Layout helpers ----
@@ -308,7 +349,7 @@ function getTubeX(i) {
 }
 
 // ---- Level generation ----
-function generateLevel(level, colors, merged) {
+function generateLevel(level, colors, merged, isChallenge) {
   const allColors = [...colors, ...merged];
   const numColors = Math.min(allColors.length, 6);
   const activeColors = allColors.slice(0, numColors);
@@ -317,19 +358,16 @@ function generateLevel(level, colors, merged) {
   const fullCount = activeColors.length;
   const totalTubes = fullCount + emptyCount;
 
-  // Build units
   let units = [];
   for (let c of activeColors) {
     for (let j = 0; j < TUBE_HEIGHT; j++) units.push(c);
   }
 
-  // Shuffle
   for (let i = units.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [units[i], units[j]] = [units[j], units[i]];
   }
 
-  // Distribute into tubes
   const tubes = [];
   for (let i = 0; i < totalTubes; i++) {
     const tube = [];
@@ -360,9 +398,21 @@ function generateLevel(level, colors, merged) {
     }
   }
 
-  const totalTime = getLevelTime(level, activeColors.length);
+  let totalTime = 0;
+  if (isChallenge) {
+    totalTime = getChallengeTime(level, activeColors.length);
+  }
 
-  return { tubes, colorsInUse: activeColors, tubeCount: totalTubes, totalTime, timeLeft: totalTime };
+  return {
+    tubes,
+    colorsInUse: activeColors,
+    tubeCount: totalTubes,
+    challengeLevel: isChallenge,
+    totalTime,
+    timeLeft: totalTime,
+    timerActive: false,
+    timerFrozen: false,
+  };
 }
 
 // ---- Pour logic ----
@@ -376,7 +426,6 @@ function canPour(srcIdx, dstIdx) {
   const srcTop = src[srcTopIdx];
   const dstEmpty = dst.filter(u => u === -1).length;
   if (dstEmpty === 0) return false;
-
   let count = 0;
   for (let i = srcTopIdx; i < TUBE_HEIGHT; i++) {
     if (src[i] === srcTop) count++;
@@ -394,21 +443,18 @@ function executePour(srcIdx, dstIdx) {
   const srcTop = src.find(u => u !== -1);
   const srcTopIdx = src.findIndex(u => u !== -1);
   const dstEmpty = dst.filter(u => u === -1).length;
-
   let count = 0;
   for (let i = srcTopIdx; i < TUBE_HEIGHT; i++) {
     if (src[i] === srcTop) count++;
     else break;
   }
   const pourCount = Math.min(count, dstEmpty);
-
   for (let i = 0; i < pourCount; i++) {
     const si = srcTopIdx + i;
     const di = dst.findIndex(u => u === -1);
     dst[di] = src[si];
     src[si] = -1;
   }
-
   src.sort((a,b) => (b === -1 ? -1 : 0) - (a === -1 ? -1 : 0));
   dst.sort((a,b) => (b === -1 ? -1 : 0) - (a === -1 ? -1 : 0));
   return pourCount;
@@ -472,13 +518,10 @@ function drawTube(x, y, tube, highlight) {
   const w = TUBE_W;
   const h = 175;
   const r = 12;
-
   ctx.save();
-
   ctx.shadowColor = 'rgba(0,0,0,0.25)';
   ctx.shadowBlur = 10;
   ctx.shadowOffsetY = 3;
-
   const grad = ctx.createLinearGradient(x, y, x, y + h);
   grad.addColorStop(0, 'rgba(255,255,255,0.07)');
   grad.addColorStop(0.5, 'rgba(255,255,255,0.02)');
@@ -497,7 +540,6 @@ function drawTube(x, y, tube, highlight) {
   ctx.closePath();
   ctx.fill();
   ctx.shadowColor = 'transparent';
-
   if (highlight) {
     ctx.strokeStyle = 'rgba(255,210,0,0.7)';
     ctx.lineWidth = 2.5;
@@ -507,34 +549,28 @@ function drawTube(x, y, tube, highlight) {
     ctx.stroke();
     ctx.shadowColor = 'transparent';
   }
-
   ctx.fillStyle = 'rgba(255,255,255,0.05)';
   ctx.beginPath();
   if (ctx.roundRect) ctx.roundRect(x + 4, y + 3, w/4, h - 6, 3);
   ctx.fill();
-
   const innerX = x + 5;
   const innerW = w - 10;
   const segH = (h - 16) / TUBE_HEIGHT;
   const topY = y + 10;
-
   for (let i = TUBE_HEIGHT - 1; i >= 0; i--) {
     const cid = tube[i];
     if (cid === -1) continue;
     const color = [...state.colorsInUse, ...state.mergedColors, ...COLORS.map(c => c.id)].includes(cid)
       ? COLORS[cid] || { hex: '#888' } : { hex: '#888' };
     const hex = color.hex;
-
     const segY = topY + (TUBE_HEIGHT - 1 - i) * segH;
     const isTop = (i === tube.findIndex(u => u !== -1));
-
     const lg = ctx.createLinearGradient(innerX, segY, innerX, segY + segH);
     lg.addColorStop(0, lighten(hex, 15));
     lg.addColorStop(0.3, hex);
     lg.addColorStop(0.8, hex);
     lg.addColorStop(1, darken(hex, 10));
     ctx.fillStyle = lg;
-
     ctx.beginPath();
     if (isTop) {
       const waveAmp = 2.5;
@@ -552,15 +588,12 @@ function drawTube(x, y, tube, highlight) {
     ctx.lineTo(innerX, segY + segH);
     ctx.closePath();
     ctx.fill();
-
     ctx.fillStyle = 'rgba(255,255,255,0.12)';
     ctx.beginPath();
     if (ctx.roundRect) ctx.roundRect(innerX + 3, segY + 2, innerW * 0.2, segH - 4, 2);
     ctx.fill();
   }
-
   ctx.restore();
-
   ctx.strokeStyle = 'rgba(255,255,255,0.08)';
   ctx.lineWidth = 1.2;
   ctx.beginPath();
@@ -601,13 +634,11 @@ function drawPourAnim() {
   const cy = t < 0.5
     ? srcY + (midY - srcY) * (t * 2)
     : midY + (dstY - midY) * ((t - 0.5) * 2);
-
   ctx.save();
   ctx.fillStyle = `rgba(255,255,255,${0.4 * (1 - p * 0.5)})`;
   ctx.beginPath();
   ctx.ellipse(cx, cy, 5 - p * 2, 7 - p * 3, 0, 0, Math.PI * 2);
   ctx.fill();
-
   if (p > 0.6) {
     const sp = (p - 0.6) / 0.4;
     ctx.fillStyle = `rgba(255,255,255,${0.2 * (1 - sp)})`;
@@ -624,11 +655,12 @@ function handleTap(mx, my) {
   const { TUBE_W } = computeLayout(state.tubeCount);
   const TUBE_H = 175;
   const BASE_Y = 195;
-
   for (let i = 0; i < state.tubeCount; i++) {
     const tx = getTubeX(i);
     if (mx >= tx && mx <= tx + TUBE_W && my >= BASE_Y && my <= BASE_Y + TUBE_H) {
-      state.timerActive = true;  // First tap starts the clock
+      if (state.challengeLevel && !state.timerActive) {
+        state.timerActive = true; // First tap starts the clock on challenge levels
+      }
       if (state.selectedTube === -1) {
         if (state.tubes[i] && state.tubes[i].some(u => u !== -1)) {
           state.selectedTube = i;
@@ -672,24 +704,22 @@ canvas.addEventListener('touchstart', (e) => {
 
 // ---- Timer ----
 function updateTimer() {
+  if (!state.challengeLevel) return;
   if (state.levelCompleted || state.timerFrozen || !state.timerActive) return;
-  state.timeLeft -= 1/60; // ~1 second per 60 frames at 60fps
-
+  state.timeLeft -= 1/60;
   if (state.timeLeft <= 0) {
     state.timeLeft = 0;
     state.timerFrozen = true;
     state.levelCompleted = true;
     showTimeUp();
   }
-
   renderTimerUI();
 }
 
 function renderTimerUI() {
+  if (!state.challengeLevel) return;
   const pct = Math.max(0, (state.timeLeft / state.totalTime) * 100);
   timerBar.style.width = pct + '%';
-
-  // Color: green → yellow → red
   if (pct > 50) {
     timerBar.style.background = 'linear-gradient(90deg, #2ecc71, #f1c40f)';
     timerBar.classList.remove('urgent');
@@ -700,19 +730,10 @@ function renderTimerUI() {
     timerBar.style.background = '#e74c3c';
     timerBar.classList.add('urgent');
   }
-
   timerDisplay.textContent = Math.ceil(state.timeLeft);
-
-  // Pulse icon when low
-  if (pct <= 20 && pct > 0) {
-    timerIcon.style.display = 'inline-block';
-  } else {
-    timerIcon.style.display = 'inline-block';
-  }
 }
 
 function showTimeUp() {
-  // Count how many tubes are fully sorted
   const sorted = getSortedColors().length;
   const total = state.colorsInUse.length + state.mergedColors.length;
   timeupProgress.textContent = `Sorted ${sorted}/${total} colors`;
@@ -729,38 +750,62 @@ function updateUI() {
   levelNum.textContent = state.level;
   movesCount.textContent = state.moves;
   const total = state.colorsInUse.length + state.mergedColors.length;
-  colorCount.textContent = total + ' color' + (total > 1 ? 's' : '');
+  let label = total + ' color' + (total > 1 ? 's' : '');
+  if (state.challengeLevel) label += ' ⚡';
+  colorCount.textContent = label;
   renderTimerUI();
 }
+
+// ---- Challenge intro ----
+function showChallengeIntro() {
+  const time = state.totalTime;
+  const colors = state.colorsInUse.length;
+  challengeTimeDisplay.textContent = time;
+  challengeColorsDisplay.textContent = colors;
+  challengeOverlay.classList.add('show');
+}
+
+challengeStartBtn.addEventListener('click', () => {
+  challengeOverlay.classList.remove('show');
+  timerArea.classList.add('show');
+  state.timerActive = false; // waits for first tap
+  updateUI();
+});
 
 // ---- Win ----
 function showWin() {
   state.levelCompleted = true;
 
   const m = state.moves;
-  const t = state.timeLeft;
-  const pctLeft = t / state.totalTime;
+  const isChallenge = state.challengeLevel;
 
-  // Star rating: moves-based (1-3) + time bonus
+  // Star rating
   let stars = 1;
   if (m <= 8) stars = 3;
   else if (m <= 14) stars = 2;
 
-  // Time bonus: extra star if >40% time remaining
-  const timeStar = pctLeft > 0.4;
-  const displayStars = timeStar ? Math.min(3, stars + 1) : stars;
+  // Time bonus on challenge levels
+  let timeStar = false;
+  if (isChallenge && state.timeLeft > 0) {
+    const pctLeft = state.timeLeft / state.totalTime;
+    timeStar = pctLeft > 0.35;
+  }
 
+  const displayStars = timeStar ? Math.min(3, stars + 1) : stars;
   winStars.textContent = '★'.repeat(displayStars) + '☆'.repeat(3 - displayStars);
 
   let msg = '';
-  if (displayStars === 3 && timeStar) msg = '✦ Lightning fast!';
+  if (displayStars === 3 && timeStar) msg = '⚡ Speed demon!';
   else if (displayStars === 3) msg = 'Flawless!';
   else if (displayStars === 2) msg = 'Great sort!';
   else msg = 'Sorted!';
   winMsg.textContent = msg;
 
   if (timeStar) {
-    timeBonusText.innerHTML = `<span class="time-bonus">⏱ +${Math.ceil(t)}s time bonus!</span>`;
+    timeBonusText.innerHTML = `<span class="time-bonus">⏱ Challenge conquered! +${Math.ceil(state.timeLeft)}s to spare!</span>`;
+    timeBonusText.style.display = 'block';
+  } else if (isChallenge) {
+    timeBonusText.innerHTML = `<span style="color:#e67e22;font-size:13px;">Made it!</span>`;
     timeBonusText.style.display = 'block';
   } else {
     timeBonusText.style.display = 'none';
@@ -768,6 +813,7 @@ function showWin() {
 
   const next = state.level + 1;
   if (next % 5 === 0) winMsg.textContent += ' ✦ Merge next!';
+  if (next % 10 === 0) winMsg.textContent += ' ⚡ Challenge next!';
 
   winOverlay.classList.add('show');
 }
@@ -780,10 +826,21 @@ nextBtn.addEventListener('click', () => {
   state.levelCompleted = false;
   state.timerActive = false;
   state.timerFrozen = false;
-  if (state.level % 5 === 0) {
+
+  // Hide timer UI for non-challenge levels
+  timerArea.classList.remove('show');
+
+  const next = state.level;
+  if (next % 10 === 0) {
+    // Challenge level — generate first, show intro, then start on button
+    const gen = generateLevel(state.level, state.colorsInUse, state.mergedColors, true);
+    Object.assign(state, gen);
+    updateUI();
+    showChallengeIntro();
+  } else if (next % 5 === 0) {
     showMergeScreen();
   } else {
-    const gen = generateLevel(state.level, state.colorsInUse, state.mergedColors);
+    const gen = generateLevel(state.level, state.colorsInUse, state.mergedColors, false);
     Object.assign(state, gen);
     updateUI();
   }
@@ -794,7 +851,7 @@ function showMergeScreen() {
   const avail = getAvailableMerges();
   if (avail.length === 0) {
     state.level++;
-    const gen = generateLevel(state.level, state.colorsInUse, state.mergedColors);
+    const gen = generateLevel(state.level, state.colorsInUse, state.mergedColors, false);
     Object.assign(state, gen);
     state.moves = 0;
     state.selectedTube = -1;
@@ -804,10 +861,8 @@ function showMergeScreen() {
     updateUI();
     return;
   }
-
   mergeOptions.innerHTML = '';
   let selected = null;
-
   avail.forEach((recipe, idx) => {
     const card = document.createElement('div');
     card.className = 'merge-card';
@@ -833,7 +888,6 @@ function showMergeScreen() {
     });
     mergeOptions.appendChild(card);
   });
-
   mergeBtn.disabled = true;
   mergeOverlay.classList.add('show');
 }
@@ -846,13 +900,11 @@ mergeBtn.addEventListener('click', () => {
   const recipe = avail[idx];
   if (!recipe) return;
   mergeOverlay.classList.remove('show');
-
   const r = recipe.result;
   newColorSwatch.style.background = COLORS[r.id].hex;
   newColorName.textContent = `✦ ${r.name} Unlocked!`;
   newColorDesc.textContent = `${COLORS[recipe.parent1].name} + ${COLORS[recipe.parent2].name} → ${r.name}`;
   mergeResult.classList.add('show');
-
   mergeResult.dataset.p1 = recipe.parent1;
   mergeResult.dataset.p2 = recipe.parent2;
   mergeResult.dataset.rid = r.id;
@@ -865,16 +917,25 @@ continueMergeBtn.addEventListener('click', () => {
   const result = COLORS[rid];
   if (result) performMerge(p1, p2, result);
   mergeResult.classList.remove('show');
-
   state.level++;
   state.moves = 0;
   state.selectedTube = -1;
   state.levelCompleted = false;
   state.timerActive = false;
   state.timerFrozen = false;
-  const gen = generateLevel(state.level, state.colorsInUse, state.mergedColors);
-  Object.assign(state, gen);
-  updateUI();
+  timerArea.classList.remove('show');
+
+  const next = state.level;
+  if (next % 10 === 0) {
+    const gen = generateLevel(state.level, state.colorsInUse, state.mergedColors, true);
+    Object.assign(state, gen);
+    updateUI();
+    showChallengeIntro();
+  } else {
+    const gen = generateLevel(state.level, state.colorsInUse, state.mergedColors, false);
+    Object.assign(state, gen);
+    updateUI();
+  }
 });
 
 // ---- Reset ----
@@ -887,8 +948,9 @@ function resetLevel() {
   state.timerFrozen = false;
   animating = false;
   document.querySelectorAll('.overlay').forEach(o => o.classList.remove('show'));
-  const gen = generateLevel(state.level, state.colorsInUse, state.mergedColors);
+  const gen = generateLevel(state.level, state.colorsInUse, state.mergedColors, state.challengeLevel);
   Object.assign(state, gen);
+  timerArea.classList.toggle('show', state.challengeLevel);
   updateUI();
 }
 
@@ -917,24 +979,18 @@ let timerAccum = 0;
 function loop(time) {
   const dt = lastTime ? Math.min((time - lastTime) / 1000, 0.05) : 0.016;
   lastTime = time;
-
   if (animating) updateAnimation(dt);
-
-  // Timer ticks every ~1s (accumulate dt)
   timerAccum += dt;
   if (timerAccum >= 1/60) {
     timerAccum -= 1/60;
     updateTimer();
   }
-
   render();
   requestAnimationFrame(loop);
 }
 
 function render() {
   ctx.clearRect(0, 0, W, H);
-
-  // Stars bg
   ctx.fillStyle = 'rgba(255,255,255,0.015)';
   for (let i = 0; i < 25; i++) {
     const sx = (i * 41 + 17) % W;
@@ -943,16 +999,18 @@ function render() {
     ctx.arc(sx, sy, 1, 0, Math.PI * 2);
     ctx.fill();
   }
-
-  // Draw tubes
   for (let i = 0; i < state.tubeCount; i++) {
     drawTube(getTubeX(i), 195, state.tubes[i], state.selectedTube === i);
   }
-
   drawPourAnim();
 
-  // Merge hint
-  if (state.level % 5 === 0 && !state.levelCompleted) {
+  // Challenge hint on canvas
+  if (state.challengeLevel && !state.levelCompleted) {
+    ctx.fillStyle = 'rgba(243,156,18,0.2)';
+    ctx.font = '11px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('⚡ Speed challenge — beat the clock!', W / 2, 380);
+  } else if (state.level % 5 === 0 && !state.levelCompleted) {
     ctx.fillStyle = 'rgba(255,210,0,0.25)';
     ctx.font = '11px system-ui, sans-serif';
     ctx.textAlign = 'center';
@@ -972,12 +1030,14 @@ function init() {
     isAnimating: false,
     timerActive: false,
     timerFrozen: false,
+    challengeLevel: false,
   });
-  const gen = generateLevel(1, state.colorsInUse, state.mergedColors);
+  const gen = generateLevel(1, state.colorsInUse, state.mergedColors, false);
   Object.assign(state, gen);
   animating = false;
   lastTime = 0;
   timerAccum = 0;
+  timerArea.classList.remove('show');
   updateUI();
   requestAnimationFrame(loop);
 }
@@ -1000,7 +1060,7 @@ if (!CanvasRenderingContext2D.prototype.roundRect) {
 }
 
 init();
-console.log('🧪 Sortopia ready! Timer active — race the clock!');
+console.log('🧪 Sortopia ready! Relaxing puzzles. Speed challenges every 10th level!');
 </script>
 </body>
 </html>

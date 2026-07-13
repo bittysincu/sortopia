@@ -824,10 +824,13 @@ function showWin() {
   const m = state.moves;
   const isChallenge = state.challengeLevel;
 
-  // Star rating
+  // Star rating — scales with color count
+  const numColors = state.colorsInUse.length + state.mergedColors.length;
+  const star3 = numColors * 3 + 2;   // 3 colors=11, 4=14, 5=17, 6=20
+  const star2 = numColors * 5 + 5;   // 3 colors=20, 4=25, 5=30, 6=35
   let stars = 1;
-  if (m <= 8) stars = 3;
-  else if (m <= 14) stars = 2;
+  if (m <= star3) stars = 3;
+  else if (m <= star2) stars = 2;
 
   // Time bonus on challenge levels
   let timeStar = false;

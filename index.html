@@ -745,6 +745,27 @@ function drawTube(x, y, tube, highlight) {
     ctx.roundRect(innerX + 1, segY + 1, innerW - 2, segH - 2, 2);
     ctx.fill();
 
+    // Nut icon overlay (small acorn/nut silhouette)
+    if (segH > 10) {
+      const nX = innerX + innerW * 0.5;
+      const nY = segY + segH * 0.5;
+      const nR = Math.min(innerW, segH) * 0.22;
+      // Nut body (small ellipse in a lighter shade)
+      ctx.fillStyle = 'rgba(255,255,255,0.18)';
+      ctx.beginPath();
+      ctx.ellipse(nX, nY + 0.5, nR, nR * 0.8, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // Nut cap line (top arc)
+      ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.arc(nX, nY - nR * 0.2, nR * 0.7, Math.PI * 1.1, Math.PI * 1.9);
+      ctx.stroke();
+      // Tiny stem
+      ctx.fillStyle = 'rgba(255,255,255,0.1)';
+      ctx.fillRect(nX - 0.5, nY - nR * 0.9, 1, nR * 0.4);
+    }
+
     // Tiny nut-texture horizontal line
     ctx.strokeStyle = 'rgba(0,0,0,0.06)';
     ctx.lineWidth = 0.5;
@@ -774,13 +795,139 @@ function drawTube(x, y, tube, highlight) {
   ctx.restore();
 }
 
+// ---- Squirrel Mascot ----
+function drawSquirrel(cx, cy, s, walkPhase, carrying, color, ft) {
+  if (!s) s = 1;
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.scale(s, s);
+
+  const tailWag = Math.sin(ft * 0.005 + walkPhase * Math.PI) * 2;
+  const legOff = Math.sin(walkPhase * Math.PI * 2) * 3;
+
+  // Tail (behind body)
+  ctx.fillStyle = '#8B6914';
+  ctx.beginPath();
+  ctx.ellipse(-6, -6 + tailWag, 12, 8, -0.5, 0, Math.PI * 2);
+  ctx.fill();
+  // Tail highlight
+  ctx.fillStyle = '#A0782C';
+  ctx.beginPath();
+  ctx.ellipse(-5, -7 + tailWag, 8, 5, -0.3, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Body
+  ctx.fillStyle = '#6B4226';
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 7, 9, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Belly
+  ctx.fillStyle = '#C49A6C';
+  ctx.beginPath();
+  ctx.ellipse(2, 2, 4, 7, 0.1, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Legs
+  ctx.fillStyle = '#5A3A1E';
+  const ld = carrying ? 0 : legOff;
+  ctx.fillRect(-4, 5 + ld, 3, 5);    // back left
+  ctx.fillRect(1, 5 - ld, 3, 5);      // back right
+  ctx.fillRect(4, 4 - ld, 3, 4);      // front left
+  ctx.fillRect(7, 4 + ld, 3, 4);      // front right
+
+  // Head
+  ctx.fillStyle = '#6B4226';
+  ctx.beginPath();
+  ctx.arc(9, -4, 6, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Ears
+  ctx.fillStyle = '#6B4226';
+  ctx.beginPath(); ctx.moveTo(5,-9); ctx.lineTo(6.5,-13); ctx.lineTo(8,-9); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(9,-9); ctx.lineTo(10.5,-13); ctx.lineTo(12,-9); ctx.fill();
+  ctx.fillStyle = '#C49A6C';
+  ctx.beginPath(); ctx.moveTo(6,-9); ctx.lineTo(7,-11.5); ctx.lineTo(8,-9); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(9.5,-9); ctx.lineTo(10.3,-11.5); ctx.lineTo(11,-9); ctx.fill();
+
+  // Eye
+  ctx.fillStyle = '#000';
+  ctx.beginPath(); ctx.arc(11, -5, 1.5, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#fff';
+  ctx.beginPath(); ctx.arc(11.5, -5.5, 0.5, 0, Math.PI * 2); ctx.fill();
+
+  // Nose
+  ctx.fillStyle = '#3D2010';
+  ctx.beginPath(); ctx.arc(14, -4, 1, 0, Math.PI * 2); ctx.fill();
+
+  // Arms
+  ctx.fillStyle = '#5A3A1E';
+  if (carrying && color) {
+    ctx.fillRect(7, -1, 3, 2);
+    ctx.fillRect(9, -1, 3, 2);
+    // Nut in paws
+    ctx.fillStyle = color;
+    ctx.beginPath(); ctx.arc(11, 0, 3.5, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.15)';
+    ctx.beginPath(); ctx.arc(10, -1, 1, 0, Math.PI * 2); ctx.fill();
+  } else {
+    ctx.fillRect(6, 1, 3, 4);
+    ctx.fillRect(9, 1, 3, 4);
+  }
+
+  ctx.restore();
+}
+
+function drawBranch(x1, y1, x2, y2, ft) {
+  const midY = Math.min(y1, y2) - 55;
+  const mx = (x1 + x2) / 2;
+  ctx.save();
+  // Branch shadow
+  ctx.strokeStyle = 'rgba(0,0,0,0.2)';
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.moveTo(x1, y1 + 5);
+  ctx.quadraticCurveTo(mx, midY + 5, x2, y2 + 5);
+  ctx.stroke();
+  // Branch body
+  ctx.strokeStyle = '#5C4033';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(x1, y1 + 4);
+  ctx.quadraticCurveTo(mx, midY + 4, x2, y2 + 4);
+  ctx.stroke();
+  // Branch highlight
+  ctx.strokeStyle = '#7A5C3A';
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(x1, y1 + 3);
+  ctx.quadraticCurveTo(mx, midY + 3, x2, y2 + 3);
+  ctx.stroke();
+  // Leaves
+  const leaves = [
+    [0.15, '#5C735C', 4, 0.2], [0.30, '#A8C9A5', 3, 0.5],
+    [0.50, '#8B5E3C', 3.5, 0.7], [0.70, '#A8C9A5', 4, 0.3],
+    [0.85, '#5C735C', 3, 0.6]
+  ];
+  for (const [lt, lc, lr, lphase] of leaves) {
+    const lx = x1 + (x2 - x1) * lt;
+    const ly = midY + (y1 - midY) * (1 - Math.pow(1 - lt * 2, 2)) + 4;
+    const drift = Math.sin(ft * 0.002 + lphase * 10) * 0.8;
+    ctx.fillStyle = lc;
+    ctx.globalAlpha = 0.6;
+    ctx.beginPath();
+    ctx.ellipse(lx + drift, ly - 2 + drift * 0.5, lr, lr * 0.5, 0.3 + lt, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  ctx.restore();
+}
+
 // ---- Animation ----
 let animating = false;
 let animData = { srcIdx: -1, dstIdx: -1, progress: 0, color: '' };
 
 function startPourAnimation(srcIdx, dstIdx) {
   animating = true;
-  // Get the color being poured
   const src = state.tubes[srcIdx];
   const cid = src.find(u => u !== -1);
   const color = COLORS[cid] || { hex: '#fff' };
@@ -790,7 +937,7 @@ function startPourAnimation(srcIdx, dstIdx) {
 
 function updateAnimation(dt) {
   if (!animating) return;
-  animData.progress += dt * 2.0;
+  animData.progress += dt * 1.8;
   if (animData.progress >= 1) {
     animating = false;
     state.isAnimating = false;
@@ -805,70 +952,79 @@ function drawPourAnim() {
   const dstX = getTubeX(animData.dstIdx) + TUBE_W / 2;
   const dstY = 195;
   const p = animData.progress;
-  const midY = Math.min(srcY, dstY) - 50;
-  const t = p;
-  const cx = srcX + (dstX - srcX) * t;
-  const cy = t < 0.5
-    ? srcY + (midY - srcY) * (t * 2)
-    : midY + (dstY - midY) * ((t - 0.5) * 2);
+  const midY = Math.min(srcY, dstY) - 55;
+  const ft = Date.now();
+
+  // Draw branch
+  drawBranch(srcX, srcY, dstX, dstY, ft);
+
+  // Squirrel position along branch arc
+  const sqT = p < 0.7 ? p / 0.7 : 1;  // arrives at destination by p=0.7
+  const sqX = srcX + (dstX - srcX) * sqT;
+  const sqY = sqT < 0.5
+    ? srcY + (midY - srcY) * (sqT * 2)
+    : midY + (dstY - midY) * ((sqT - 0.5) * 2);
+
+  const walkPhase = p * 8;
+  const isCarrying = p < 0.7;
 
   ctx.save();
 
-  // Colored stream
-  const streamW = 4 + (1 - p) * 2;
-  const streamAlpha = 0.7 * (1 - p * 0.3);
-  ctx.strokeStyle = animData.color;
-  ctx.globalAlpha = streamAlpha;
-  ctx.lineWidth = streamW;
-  ctx.lineCap = 'round';
-  ctx.beginPath();
-  ctx.moveTo(srcX, srcY);
-  const cp1x = srcX + (dstX - srcX) * 0.3;
-  const cp1y = midY;
-  const cp2x = srcX + (dstX - srcX) * 0.7;
-  const cp2y = dstY;
-  ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, dstX, dstY);
-  ctx.stroke();
-
-  // Stream glow
-  ctx.strokeStyle = animData.color;
-  ctx.globalAlpha = 0.15;
-  ctx.lineWidth = streamW + 6;
-  ctx.beginPath();
-  ctx.moveTo(srcX, srcY);
-  ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, dstX, dstY);
-  ctx.stroke();
-
-  // Source droplet
-  ctx.globalAlpha = 1;
-  ctx.fillStyle = lighten(animData.color, 20);
-  ctx.beginPath();
-  ctx.ellipse(cx, cy, 4 - p * 1.5, 5 - p * 2, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Splash at destination (second half)
-  if (p > 0.5) {
-    const sp = (p - 0.5) / 0.5;
-    const splashCount = 4;
-    for (let i = 0; i < splashCount; i++) {
-      const angle = (i / splashCount) * Math.PI * 2 + Date.now() * 0.002;
-      const dist = 8 * sp * (1 + Math.sin(i * 1.7) * 0.5);
-      const sx = dstX + Math.cos(angle) * dist;
-      const sy = dstY + Math.abs(Math.sin(angle)) * dist + (1 - sp) * 4;
-      const rad = 2.5 * (1 - sp) * (0.5 + Math.sin(i * 2.3) * 0.3);
-      ctx.fillStyle = animData.color;
-      ctx.globalAlpha = 0.5 * (1 - sp);
-      ctx.beginPath();
-      ctx.arc(sx, sy, Math.max(0.5, rad), 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    // Base splash pool
+  if (p < 0.06) {
+    // Squirrel appears at source, grows in
+    const ap = p / 0.06;
+    const scale = ap * (0.7 + ap * 0.3);
+    drawSquirrel(srcX + 8, srcY - 5 + (1 - ap) * 3, scale, 0, false, animData.color, ft);
+  } else if (p >= 0.7 && p < 0.82) {
+    // Drop nut! Squirrel releases it
+    const dp = (p - 0.7) / 0.12;
+    // Draw squirrel at destination, arms empty
+    const squat = 1 + dp * 0.15;
+    drawSquirrel(dstX, dstY - 8 + dp * 3, squat, 0, false, animData.color, ft);
+    // Falling nut
     ctx.fillStyle = animData.color;
-    ctx.globalAlpha = 0.15 * (1 - sp);
+    ctx.globalAlpha = 1;
+    const nutY = dstY - 12 + dp * 20;
+    const nutS = 3.5 - dp * 0.5;
+    ctx.shadowColor = animData.color;
+    ctx.shadowBlur = dp < 0.5 ? 8 : 0;
     ctx.beginPath();
-    ctx.ellipse(dstX, dstY + 10, 12 * sp, 3 * sp * (1 + sp), 0, 0, Math.PI * 2);
+    ctx.arc(dstX, nutY, Math.max(1, nutS), 0, Math.PI * 2);
     ctx.fill();
+    ctx.shadowBlur = 0;
+    // Small impact sparkle when nut lands
+    if (dp > 0.85) {
+      const sp = (dp - 0.85) / 0.15;
+      ctx.fillStyle = animData.color;
+      for (let i = 0; i < 3; i++) {
+        const a = (i / 3) * Math.PI * 2 + ft * 0.003;
+        const d = 4 * sp * (1 - sp);
+        ctx.globalAlpha = 0.4 * (1 - sp);
+        ctx.beginPath();
+        ctx.arc(dstX + Math.cos(a) * d, dstY + 5 + Math.sin(a) * d, 2 * (1 - sp), 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    }
+  } else if (p >= 0.82) {
+    // Squirrel rests at destination, fades out
+    const fp = (p - 0.82) / 0.18;
+    ctx.globalAlpha = 1 - fp;
+    drawSquirrel(dstX, dstY - 6, 1.1, ft * 0.002, false, animData.color, ft);
+    ctx.globalAlpha = 1;
+    // Destination glow
+    ctx.fillStyle = animData.color;
+    ctx.globalAlpha = 0.08 * (1 - fp);
+    ctx.shadowColor = animData.color;
+    ctx.shadowBlur = 20;
+    ctx.beginPath();
+    ctx.arc(dstX, dstY + 10, 16, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = 1;
+  } else {
+    // Squirrel running along branch with nut
+    drawSquirrel(sqX, sqY - 7, 0.9, walkPhase, isCarrying, animData.color, ft);
   }
 
   ctx.restore();

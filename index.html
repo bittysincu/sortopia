@@ -11,7 +11,27 @@
     min-height: 100vh; display: flex; justify-content: center; align-items: center;
     font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
     touch-action: none; user-select: none; overflow: hidden;
+    position: relative;
   }
+  /* Floating background particles via pseudo-element */
+  body::before {
+    content: ''; position: fixed; inset: 0; pointer-events: none;
+    background:
+      radial-gradient(2px 2px at 20% 30%, rgba(255,255,255,0.1), transparent),
+      radial-gradient(2px 2px at 40% 70%, rgba(255,255,255,0.08), transparent),
+      radial-gradient(3px 3px at 60% 20%, rgba(255,255,255,0.12), transparent),
+      radial-gradient(2px 2px at 80% 50%, rgba(255,255,255,0.06), transparent),
+      radial-gradient(2px 2px at 70% 80%, rgba(255,255,255,0.1), transparent),
+      radial-gradient(3px 3px at 10% 60%, rgba(255,255,255,0.07), transparent),
+      radial-gradient(2px 2px at 90% 10%, rgba(255,255,255,0.09), transparent),
+      radial-gradient(2px 2px at 50% 90%, rgba(255,255,255,0.05), transparent);
+    animation: twinkle 4s ease-in-out infinite alternate;
+  }
+  @keyframes twinkle {
+    0% { opacity: 0.6; }
+    100% { opacity: 1; }
+  }
+
   #game {
     background: rgba(255,255,255,0.04);
     border-radius: 32px;
@@ -22,7 +42,14 @@
     box-shadow: 0 20px 60px rgba(0,0,0,0.5);
     backdrop-filter: blur(8px);
     position: relative;
+    border: 1px solid rgba(255, 210, 0, 0.06);
+    animation: cardGlow 6s ease-in-out infinite alternate;
   }
+  @keyframes cardGlow {
+    0% { box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
+    100% { box-shadow: 0 20px 80px rgba(247,151,30,0.08), 0 20px 60px rgba(0,0,0,0.5); }
+  }
+
   #header {
     display: flex; justify-content: space-between; align-items: center;
     padding: 4px 8px 8px;
@@ -95,22 +122,71 @@
     align-items: center;
     z-index: 10;
     padding: 30px;
+    animation: none;
   }
-  .overlay.show { display: flex; }
+  .overlay.show {
+    display: flex;
+    animation: popIn 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  }
+  @keyframes popIn {
+    0% { transform: scale(0.85); opacity: 0; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+  @keyframes fadeIn {
+    0% { opacity: 0; }
+    100% { opacity: 1; }
+  }
+  @keyframes slideUp {
+    0% { transform: translateY(20px); opacity: 0; }
+    100% { transform: translateY(0); opacity: 1; }
+  }
+  @keyframes starPop {
+    0% { transform: scale(0); opacity: 0; }
+    60% { transform: scale(1.3); }
+    100% { transform: scale(1); opacity: 1; }
+  }
+  @keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.03); }
+    100% { transform: scale(1); }
+  }
 
   .overlay h2 { color: #ffd200; font-size: 26px; margin-bottom: 4px;
     text-shadow: 0 0 30px rgba(255,210,0,0.2); }
-  .overlay h2.danger { color: #e74c3c; text-shadow: 0 0 30px rgba(231,76,60,0.3); }
   .overlay h2.challenge { color: #f39c12; text-shadow: 0 0 30px rgba(243,156,18,0.3); }
   .overlay p { color: rgba(255,255,255,0.5); font-size: 13px; margin-bottom: 18px; text-align: center; line-height: 1.5; }
   .overlay button {
     background: linear-gradient(135deg, #f7971e, #ffd200);
     border: none; color: #1a1a2e; font-weight: 700; font-size: 15px;
     padding: 10px 36px; border-radius: 30px; cursor: pointer;
-    transition: transform 0.12s;
+    transition: transform 0.12s, box-shadow 0.2s;
+    box-shadow: 0 4px 15px rgba(247,151,30,0.2);
   }
-  .overlay button:active { transform: scale(0.95); }
-  .overlay button:disabled { opacity: 0.3; cursor: default; transform: none; }
+  .overlay button:hover { box-shadow: 0 6px 25px rgba(247,151,30,0.35); }
+  .overlay button:active { transform: scale(0.95); box-shadow: 0 2px 8px rgba(247,151,30,0.15); }
+  .overlay button:disabled { opacity: 0.3; cursor: default; transform: none; box-shadow: none; }
+
+  .overlay .btn-secondary {
+    background: rgba(255,255,255,0.08);
+    color: rgba(255,255,255,0.7);
+    box-shadow: none;
+  }
+  .overlay .btn-secondary:hover {
+    background: rgba(255,255,255,0.12);
+    box-shadow: none;
+  }
+
+  /* Star rating with staggered animation */
+  .star-rating {
+    color: #ffd200; font-size: 32px; letter-spacing: 8px; margin-bottom: 8px;
+    text-shadow: 0 0 20px rgba(255,210,0,0.3);
+  }
+  .star-rating .star {
+    display: inline-block;
+    animation: starPop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+  }
+  .star-rating .star:nth-child(2) { animation-delay: 0.12s; }
+  .star-rating .star:nth-child(3) { animation-delay: 0.24s; }
 
   .merge-options { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin-bottom: 16px; }
   .merge-card {
@@ -121,7 +197,7 @@
     cursor: pointer; transition: all 0.2s;
     min-width: 90px;
   }
-  .merge-card:hover { border-color: #ffd200; background: rgba(255,210,0,0.1); }
+  .merge-card:hover { border-color: #ffd200; background: rgba(255,210,0,0.1); transform: translateY(-2px); }
   .merge-card:active { transform: scale(0.95); }
   .merge-card .pair { display: flex; align-items: center; gap: 6px; }
   .merge-card .swatch { width: 36px; height: 36px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.15); }
@@ -564,13 +640,15 @@ function drawTube(x, y, tube, highlight) {
   const h = 175;
   const r = 12;
   ctx.save();
-  ctx.shadowColor = 'rgba(0,0,0,0.25)';
-  ctx.shadowBlur = 10;
-  ctx.shadowOffsetY = 3;
-  const grad = ctx.createLinearGradient(x, y, x, y + h);
-  grad.addColorStop(0, 'rgba(255,255,255,0.07)');
-  grad.addColorStop(0.5, 'rgba(255,255,255,0.02)');
-  grad.addColorStop(1, 'rgba(255,255,255,0.05)');
+  // Glass tube body
+  ctx.shadowColor = 'rgba(0,0,0,0.3)';
+  ctx.shadowBlur = 14;
+  ctx.shadowOffsetY = 4;
+  const grad = ctx.createLinearGradient(x, y, x + w, y + h);
+  grad.addColorStop(0, 'rgba(255,255,255,0.09)');
+  grad.addColorStop(0.3, 'rgba(255,255,255,0.03)');
+  grad.addColorStop(0.7, 'rgba(255,255,255,0.02)');
+  grad.addColorStop(1, 'rgba(255,255,255,0.06)');
   ctx.fillStyle = grad;
   ctx.beginPath();
   ctx.moveTo(x + r, y);
@@ -585,19 +663,57 @@ function drawTube(x, y, tube, highlight) {
   ctx.closePath();
   ctx.fill();
   ctx.shadowColor = 'transparent';
+
+  // Glass edge stroke
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.stroke();
+
+  // Left glass reflection (light highlight strip)
+  const refGrad = ctx.createLinearGradient(x, y, x + w * 0.35, y);
+  refGrad.addColorStop(0, 'rgba(255,255,255,0.12)');
+  refGrad.addColorStop(0.5, 'rgba(255,255,255,0.04)');
+  refGrad.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = refGrad;
+  ctx.beginPath();
+  ctx.roundRect(x + 4, y + 4, w * 0.28, h - 8, 6);
+  ctx.fill();
+
+  // Tube base highlight (bottom curve)
+  const baseGrad = ctx.createLinearGradient(x, y + h - 20, x, y + h);
+  baseGrad.addColorStop(0, 'rgba(255,255,255,0)');
+  baseGrad.addColorStop(1, 'rgba(255,255,255,0.06)');
+  ctx.fillStyle = baseGrad;
+  ctx.beginPath();
+  ctx.roundRect(x + 6, y + h - 16, w - 12, 14, 4);
+  ctx.fill();
+
+  // Selected tube: animated gold glow
   if (highlight) {
-    ctx.strokeStyle = 'rgba(255,210,0,0.7)';
+    const pulse = Math.sin(Date.now() * 0.003) * 0.3 + 0.7;
+    ctx.shadowColor = `rgba(255,210,0,${0.15 * pulse})`;
+    ctx.shadowBlur = 20 * pulse;
+    ctx.strokeStyle = `rgba(255,210,0,${0.5 * pulse})`;
     ctx.lineWidth = 2.5;
-    ctx.stroke();
-    ctx.shadowColor = 'rgba(255,210,0,0.25)';
-    ctx.shadowBlur = 15;
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
     ctx.stroke();
     ctx.shadowColor = 'transparent';
   }
-  ctx.fillStyle = 'rgba(255,255,255,0.05)';
-  ctx.beginPath();
-  if (ctx.roundRect) ctx.roundRect(x + 4, y + 3, w/4, h - 6, 3);
-  ctx.fill();
+
+  // Color segments
   const innerX = x + 5;
   const innerW = w - 10;
   const segH = (h - 16) / TUBE_HEIGHT;
@@ -610,18 +726,22 @@ function drawTube(x, y, tube, highlight) {
     const hex = color.hex;
     const segY = topY + (TUBE_HEIGHT - 1 - i) * segH;
     const isTop = (i === tube.findIndex(u => u !== -1));
-    const lg = ctx.createLinearGradient(innerX, segY, innerX, segY + segH);
-    lg.addColorStop(0, lighten(hex, 15));
-    lg.addColorStop(0.3, hex);
-    lg.addColorStop(0.8, hex);
-    lg.addColorStop(1, darken(hex, 10));
+
+    // Segment gradient: lighter top, darker bottom for 3D look
+    const lg = ctx.createLinearGradient(innerX, segY, innerX + innerW, segY + segH);
+    lg.addColorStop(0, lighten(hex, 20));
+    lg.addColorStop(0.2, hex);
+    lg.addColorStop(0.7, hex);
+    lg.addColorStop(1, darken(hex, 15));
     ctx.fillStyle = lg;
     ctx.beginPath();
     if (isTop) {
+      // Animated wave on top surface
       const waveAmp = 2.5;
+      const now = Date.now();
       ctx.moveTo(innerX, segY + waveAmp);
-      for (let px = 0; px <= innerW; px += 5) {
-        const wave = Math.sin(px * 0.12 + Date.now() * 0.0015) * waveAmp;
+      for (let px = 0; px <= innerW; px += 4) {
+        const wave = Math.sin(px * 0.12 + now * 0.0015) * waveAmp;
         ctx.lineTo(innerX + px, segY + wave);
       }
       ctx.lineTo(innerX + innerW, segY);
@@ -633,33 +753,36 @@ function drawTube(x, y, tube, highlight) {
     ctx.lineTo(innerX, segY + segH);
     ctx.closePath();
     ctx.fill();
-    ctx.fillStyle = 'rgba(255,255,255,0.12)';
+
+    // Segment reflection highlight (left side)
+    const segRef = ctx.createLinearGradient(innerX, segY, innerX + innerW * 0.3, segY);
+    segRef.addColorStop(0, 'rgba(255,255,255,0.15)');
+    segRef.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = segRef;
     ctx.beginPath();
-    if (ctx.roundRect) ctx.roundRect(innerX + 3, segY + 2, innerW * 0.2, segH - 4, 2);
+    ctx.roundRect(innerX + 2, segY + 1, innerW * 0.18, segH - 2, 2);
     ctx.fill();
   }
   ctx.restore();
-  ctx.strokeStyle = 'rgba(255,255,255,0.08)';
-  ctx.lineWidth = 1.2;
-  ctx.beginPath();
-  ctx.moveTo(x + r, y);
-  ctx.lineTo(x + w - r, y);
-  ctx.stroke();
 }
 
 // ---- Animation ----
 let animating = false;
-let animData = { srcIdx: -1, dstIdx: -1, progress: 0 };
+let animData = { srcIdx: -1, dstIdx: -1, progress: 0, color: '' };
 
 function startPourAnimation(srcIdx, dstIdx) {
   animating = true;
-  animData = { srcIdx, dstIdx, progress: 0 };
+  // Get the color being poured
+  const src = state.tubes[srcIdx];
+  const cid = src.find(u => u !== -1);
+  const color = COLORS[cid] || { hex: '#fff' };
+  animData = { srcIdx, dstIdx, progress: 0, color: color.hex };
   state.isAnimating = true;
 }
 
 function updateAnimation(dt) {
   if (!animating) return;
-  animData.progress += dt * 2.2;
+  animData.progress += dt * 2.0;
   if (animData.progress >= 1) {
     animating = false;
     state.isAnimating = false;
@@ -668,9 +791,10 @@ function updateAnimation(dt) {
 
 function drawPourAnim() {
   if (!animating) return;
-  const srcX = getTubeX(animData.srcIdx) + computeLayout(state.tubeCount).TUBE_W / 2;
+  const { TUBE_W } = computeLayout(state.tubeCount);
+  const srcX = getTubeX(animData.srcIdx) + TUBE_W / 2;
   const srcY = 195;
-  const dstX = getTubeX(animData.dstIdx) + computeLayout(state.tubeCount).TUBE_W / 2;
+  const dstX = getTubeX(animData.dstIdx) + TUBE_W / 2;
   const dstY = 195;
   const p = animData.progress;
   const midY = Math.min(srcY, dstY) - 50;
@@ -679,18 +803,66 @@ function drawPourAnim() {
   const cy = t < 0.5
     ? srcY + (midY - srcY) * (t * 2)
     : midY + (dstY - midY) * ((t - 0.5) * 2);
+
   ctx.save();
-  ctx.fillStyle = `rgba(255,255,255,${0.4 * (1 - p * 0.5)})`;
+
+  // Colored stream
+  const streamW = 4 + (1 - p) * 2;
+  const streamAlpha = 0.7 * (1 - p * 0.3);
+  ctx.strokeStyle = animData.color;
+  ctx.globalAlpha = streamAlpha;
+  ctx.lineWidth = streamW;
+  ctx.lineCap = 'round';
   ctx.beginPath();
-  ctx.ellipse(cx, cy, 5 - p * 2, 7 - p * 3, 0, 0, Math.PI * 2);
+  ctx.moveTo(srcX, srcY);
+  const cp1x = srcX + (dstX - srcX) * 0.3;
+  const cp1y = midY;
+  const cp2x = srcX + (dstX - srcX) * 0.7;
+  const cp2y = dstY;
+  ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, dstX, dstY);
+  ctx.stroke();
+
+  // Stream glow
+  ctx.strokeStyle = animData.color;
+  ctx.globalAlpha = 0.15;
+  ctx.lineWidth = streamW + 6;
+  ctx.beginPath();
+  ctx.moveTo(srcX, srcY);
+  ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, dstX, dstY);
+  ctx.stroke();
+
+  // Source droplet
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = lighten(animData.color, 20);
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, 4 - p * 1.5, 5 - p * 2, 0, 0, Math.PI * 2);
   ctx.fill();
-  if (p > 0.6) {
-    const sp = (p - 0.6) / 0.4;
-    ctx.fillStyle = `rgba(255,255,255,${0.2 * (1 - sp)})`;
+
+  // Splash at destination (second half)
+  if (p > 0.5) {
+    const sp = (p - 0.5) / 0.5;
+    const splashCount = 4;
+    for (let i = 0; i < splashCount; i++) {
+      const angle = (i / splashCount) * Math.PI * 2 + Date.now() * 0.002;
+      const dist = 8 * sp * (1 + Math.sin(i * 1.7) * 0.5);
+      const sx = dstX + Math.cos(angle) * dist;
+      const sy = dstY + Math.abs(Math.sin(angle)) * dist + (1 - sp) * 4;
+      const rad = 2.5 * (1 - sp) * (0.5 + Math.sin(i * 2.3) * 0.3);
+      ctx.fillStyle = animData.color;
+      ctx.globalAlpha = 0.5 * (1 - sp);
+      ctx.beginPath();
+      ctx.arc(sx, sy, Math.max(0.5, rad), 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Base splash pool
+    ctx.fillStyle = animData.color;
+    ctx.globalAlpha = 0.15 * (1 - sp);
     ctx.beginPath();
-    ctx.ellipse(dstX, dstY + 8, 10 * sp, 3 * sp, 0, 0, Math.PI * 2);
+    ctx.ellipse(dstX, dstY + 10, 12 * sp, 3 * sp * (1 + sp), 0, 0, Math.PI * 2);
     ctx.fill();
   }
+
   ctx.restore();
 }
 
@@ -840,7 +1012,14 @@ function showWin() {
   }
 
   const displayStars = timeStar ? Math.min(3, stars + 1) : stars;
-  winStars.textContent = '★'.repeat(displayStars) + '☆'.repeat(3 - displayStars);
+  // Split stars into individual spans for staggered animation
+  winStars.innerHTML = '';
+  for (let i = 0; i < 3; i++) {
+    const span = document.createElement('span');
+    span.className = 'star';
+    span.textContent = i < displayStars ? '★' : '☆';
+    winStars.appendChild(span);
+  }
 
   let msg = '';
   if (displayStars === 3 && timeStar) msg = '⚡ Speed demon!';
@@ -1023,30 +1202,66 @@ function darken(hex, amt) {
 // ---- Game loop ----
 let lastTime = 0;
 let timerAccum = 0;
+// Ambient particles
+let ambientParticles = [];
+for (let i = 0; i < 15; i++) {
+  ambientParticles.push({
+    x: Math.random() * W,
+    y: Math.random() * H,
+    vx: (Math.random() - 0.5) * 0.15,
+    vy: -Math.random() * 0.2 - 0.05,
+    r: Math.random() * 4 + 2,
+    alpha: Math.random() * 0.3 + 0.05,
+    phase: Math.random() * Math.PI * 2,
+  });
+}
+let canvasPulse = 0;
+let frameTime = 0;
 
 function loop(time) {
   const dt = lastTime ? Math.min((time - lastTime) / 1000, 0.05) : 0.016;
   lastTime = time;
+  frameTime = time;
   if (animating) updateAnimation(dt);
   timerAccum += dt;
   if (timerAccum >= 1/60) {
     timerAccum -= 1/60;
     updateTimer();
   }
-  render();
+  render(dt);
   requestAnimationFrame(loop);
 }
 
-function render() {
+function render(dt) {
   ctx.clearRect(0, 0, W, H);
-  ctx.fillStyle = 'rgba(255,255,255,0.015)';
-  for (let i = 0; i < 25; i++) {
-    const sx = (i * 41 + 17) % W;
-    const sy = (i * 67 + 11) % H;
+
+  // Background gradient
+  const bgGrad = ctx.createRadialGradient(W * 0.5, H * 0.15, 0, W * 0.5, H * 0.15, W * 0.8);
+  bgGrad.addColorStop(0, 'rgba(255,255,255,0.02)');
+  bgGrad.addColorStop(0.5, 'rgba(255,255,255,0.008)');
+  bgGrad.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = bgGrad;
+  ctx.fillRect(0, 0, W, H);
+
+  // Ambient floating particles (bubbles)
+  for (const p of ambientParticles) {
+    p.x += p.vx + Math.sin(frameTime * 0.0005 + p.phase) * 0.05;
+    p.y += p.vy;
+    if (p.y < -10) { p.y = H + 10; p.x = Math.random() * W; }
+    if (p.x < -10) p.x = W + 10;
+    if (p.x > W + 10) p.x = -10;
+    ctx.fillStyle = `rgba(255,255,255,${p.alpha * (0.8 + Math.sin(frameTime * 0.001 + p.phase) * 0.2)})`;
     ctx.beginPath();
-    ctx.arc(sx, sy, 1, 0, Math.PI * 2);
+    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+    ctx.fill();
+    // Bubble highlight
+    ctx.fillStyle = `rgba(255,255,255,${p.alpha * 0.3})`;
+    ctx.beginPath();
+    ctx.arc(p.x - p.r * 0.25, p.y - p.r * 0.25, p.r * 0.35, 0, Math.PI * 2);
     ctx.fill();
   }
+
+  // Draw tubes
   for (let i = 0; i < state.tubeCount; i++) {
     drawTube(getTubeX(i), 195, state.tubes[i], state.selectedTube === i);
   }
